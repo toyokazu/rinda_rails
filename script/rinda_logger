@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+
+# initialize minimum rinda_rails
+# ready to load rails libraries
+require File.expand_path('../../config/rinda_min_environment',  __FILE__)
+
+options = {
+  :uri         => 'druby://:0',
+  :config      => "#{RAILS_ROOT}/config/rinda_logger.yml",
+  :detach      => false,
+  :worker      => :logger
+}
+
+class LoggerRunner < Rinda::WorkerRunner
+  def create_workers(ts)
+      synchronize do
+        if options[:ts_uri].nil?
+          provider = Rinda::RingProvider.new(worker_class_name.to_sym, DRbObject.new(logger),Rinda::Worker.key(DRb.uri, object_id))
+          provider.provide
+        else
+          ts.write([:name, worker_class_name.to_sym, DRbObject.new(logger), Rinda::Worker.key(DRb.uri, object_id)])
+        end
+      end
+  end
+end
+
+runner = LoggerRunner.new(ARGV, options)
+runner.run!

@@ -1,0 +1,87 @@
+#!/usr/bin/env ruby
+
+# initialize minimum rinda_rails
+# ready to load rails libraries
+require File.expand_path('../../config/rinda_min_environment',  __FILE__)
+
+# initialize rubygems libraries
+require 'rubygems'
+require 'daemons'
+
+options = {
+  :uri         => 'druby://:0',
+  :config      => "#{RAILS_ROOT}/config/rinda_ts.yml",
+  :detach      => false,
+  :log_file    => 'rinda_ts.log',
+  :pid_file    => 'rinda_ts.pid'
+}
+
+class TSRunner < DRb::Runner
+  include Daemonize
+
+  def create_ts
+    @ts = Rinda::TupleSpace.new
+    if options[:without_ring_server]
+      DRb.start_service(options[:uri], @ts)
+      logger.info "Starting Rinda::TupleSpace without Rinda::RingServer"
+    else
+      DRb.start_service(options[:uri])
+      place = Rinda::RingServer.new(@ts)
+      logger.info "Starting Rinda::TupleSpace with Rinda::RingServer"
+    end
+    logger.info DRb.uri
+  end
+
+  def parser
+    @parser ||= OptionParser.new do |opts|
+      opts.banner = "Usage: #{self.class.command} [options] #{self.class.operations.join('|')}"
+
+      opts.separator ""
+
+      opts.separator "options:"
+      opts.on("-u", "--uri=uri", String, "Runs Rinda TupleSpace Server or RingServer on the specified url.", "Default: druby://:0") { |v| options[:uri] = v }
+      opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| options[:config] = v }
+      opts.on("-d", "--daemon", "Make server run as a Daemon.") { options[:detach] = true }
+      opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_ts.log") { |v| options[:log_file] = v }
+      opts.on("-r", "--without-ring-server", "Make this server run as a stand alone dRuby server (without RingServer).") { options[:without_ring_server] = true }
+
+      opts.separator ""
+
+      opts.on("-h", "--help", "Show this help message.") { puts opts; exit }
+    end
+  end
+
+  def cmd_start
+    if options[:detach]
+      raise RuntimeError, "Rinda::TupleSpace Server is already running." if File.exist?(pid_file)
+      daemonize(log_file)
+      #Process.daemon (supported only by Ruby 1.9)
+      File.open(pid_file, 'w'){ |f| f.write(Process.pid) }
+      at_exit do
+        while (tuples = Rinda::Worker.read_all(@ts, nil)).size > 0 do
+          # send exit_request to the worker class in the first tuple
+          (eval tuples[0][1].to_s).new(@ts).exit_request
+          #FIXME
+          sleep 1
+        end
+        File.delete(pid_file) if File.exist?(pid_file)
+      end
+      create_ts
+      DRb.thread.join
+    else
+      at_exit do
+        while (tuples = Rinda::Worker.read_all(@ts, nil)).size > 0 do
+          # send exit_request to the worker class in the first tuple
+          (eval tuples[0][1].to_s).new(@ts).exit_request
+          #FIXME
+          sleep 1
+        end
+      end
+      create_ts
+      $stdin.gets
+    end
+  end
+end
+
+runner = TSRunner.new(ARGV, options)
+runner.run!

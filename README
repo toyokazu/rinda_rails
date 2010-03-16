@@ -1,0 +1,33 @@
+Rinda Rails
+===========
+
+    RindaRails plugin helps to write master-worker style programming with Rails
+    environment using Rinda frameworks.
+
+
+Example
+=======
+
+    The following command stubs out a new worker. Pass worker name,
+    under_scored.
+
+    `./script/generate rinda_worker analyzer`
+
+
+Configuration
+=============
+
+    To use worker class at job submitter, app/workers path must be appended
+    to the load_paths of Rails.
+
+    edit config/environment.rb
+
+    Rails::Initializer.run do |config|
+    ...
+      # add config.load_paths setting
+      config.load_paths += %W( #{RAILS_ROOT}/app/workers )
+    ...
+    end
+
+
+Copyright (c) 2010 Toyokazu Akiyama, released under the MIT license

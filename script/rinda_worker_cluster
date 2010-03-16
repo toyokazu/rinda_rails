@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+
+# initialize ruby standard libraries
+require 'digest'
+
+# initialize minimum rinda_rails
+# ready to load rails libraries
+require File.expand_path('../../config/rinda_min_environment',  __FILE__)
+
+options = {
+  :uri            => 'druby://:0',
+  :command        => 'rinda_worker',
+  :config         => "#{RAILS_ROOT}/config/rinda_worker_cluster.yml",
+  :detach         => true,
+  :environment    => 'development',
+  :log_file       => 'rinda_worker_cluster.log',
+  :pid_file       => 'rinda_worker_cluster.pid',
+  :pid_file_prefix  => 'rinda_worker',
+  :num_processes  => '1',
+  :num_threads    => '1',
+  :worker         => :analyzer
+}
+
+class WorkerClusterRunner < DRb::Runner
+  def parser
+    @parser ||= OptionParser.new do |opts|
+      opts.banner = "Usage: #{self.class.command} [options] #{self.class.operations.join('|')}"
+      
+      opts.separator ""
+
+      opts.separator "options:"
+      opts.on("-u", "--uri=uri", String, "Runs Rinda Worker on the specified url.", "Default: druby://:0") { |v| options[:uri] = v }
+      opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| options[:config] = v }
+      opts.on("-e", "--environment=name", String, "Specifies the environment to run this server under (test/development/production).", "Default: development") { |v| options[:environment] = v }
+      opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_worker.log") { |v| options[:log_file] = v }
+      opts.on("-n", "--processes=number", String, "Specifies number of worker processes for this worker cluster.", "Default: 1") { |v| options[:num_processes] = v }
+      opts.on("-p", "--pid=file", String, "Specifies prefix of pid file name [prefix]_[random hash value].pid for this server.", "Default: rinda_worker") { |v| options[:pid_file_prefix] = v }
+      opts.on("-s", "--ts-uri=uri", String, "Specifies Rinda::TupleSpace Server dRuby URI.") { |v| options[:ts_uri] = v }
+      opts.on("-t", "--threads=number", String, "Specifies number of worker threads for each worker process.", "Default: 1") { |v| options[:num_threads] = v }
+      opts.on("-w", "--worker=worker_class", String, "Specifies worker class name in 'underscore' form as rails.", "No default value (or may be specified in start up script)") { |v| options[:worker] = v.to_s.underscore.to_sym }
+
+      opts.separator ""
+
+      opts.on("-h", "--help", "Show this help message.") { puts opts; exit }
+    end
+  end
+
+  def cmd_start
+    options[:num_processes].to_i.times do
+      opts = nil
+      opts = "--ts-uri='#{options[:ts_uri]}'" if !options[:ts_uri].nil?
+      hash = Digest::SHA1.hexdigest(Time.now.to_s + rand.to_s)[0..15]
+      cmd = "/usr/bin/env RAILS_ENV=#{options[:environment]} #{RAILS_ROOT}/script/#{options[:command]} --daemon --threads=#{options[:num_threads]} --environment=#{options[:environment]} --log=#{options[:log_file]} --pid=#{options[:pid_file_prefix]}_#{hash}.pid --worker=#{options[:worker]} #{opts} start"
+      puts cmd
+      puts `#{cmd}`
+    end
+  end
+
+  def cmd_stop
+    Dir.glob("#{Pathname.new(pid_file).dirname}/#{options[:pid_file_prefix]}_*.pid") do |file|
+      cmd = "/usr/bin/env RAILS_ENV=#{options[:environment]} #{RAILS_ROOT}/script/#{options[:command]} --pid=#{File.basename(file)} stop"
+      puts cmd
+      puts `#{cmd}`
+    end
+  end
+end
+
+runner = WorkerClusterRunner.new(ARGV, options)
+runner.run!

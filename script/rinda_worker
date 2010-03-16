@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+
+# initialize rinda_rails
+# ready to load rails libraries
+require File.expand_path('../../config/rinda_environment',  __FILE__)
+
+options = {
+  :uri          => 'druby://:0',
+  :config       => "#{RAILS_ROOT}/config/rinda_worker.yml",
+  :detach       => false,
+  :num_threads  => '1',
+  :worker       => 'analyzer'
+}
+
+class RailsWorkerRunner < Rinda::WorkerRunner; end
+
+runner = RailsWorkerRunner.new(ARGV, options)
+runner.run!
