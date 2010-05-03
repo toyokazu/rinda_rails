@@ -19,7 +19,7 @@ module Rinda
 
   class Worker
     attr_reader :ts, :renewer, :key, :logger
-    # Analyzer is initialized with Rinda::TupleSpace instance.
+    # Rinda::Worker instance must be initialized with Rinda::TupleSpace instance.
     # Before getting TupleSpace instance, you need to call DRb.start_service.
     def initialize(ts, options = {})
       @ts = ts
@@ -33,7 +33,7 @@ module Rinda
         @logger = Logger.new(STDOUT)
         @logger.level = Logger::INFO
       end
-      @key = Rinda::Worker.key(DRb.uri, object_id)
+      @key = options[:key] || Rinda::Worker.key(DRb.uri, object_id)
     end
 
     def main_loop
@@ -62,30 +62,38 @@ module Rinda
       @ts.write([@request, @key, class_name, method_name, options, stream], renewer)
     end
 
+    def cancel_request
+      tuple = @ts.take([@request, @key, Symbol, Symbol, nil, nil], renewer)
+    end
+
+    def cancel_request_with_options(options = nil)
+      tuple = @ts.take([@request, @key, Symbol, Symbol, options, nil], renewer)
+    end
+
     def exit_request
       @ts.write([@request, @key, self.class.to_s.to_sym, :exit_worker, {}, nil], renewer)
     end
 
     def take_done
-      @ts.take([@done, @key, Symbol, Symbol, Hash], renewer)
+      @ts.take([@done, @key, Symbol, Symbol, nil], renewer)
     end
 
     # job monitoring methods
     def read_request_all
-      @ts.read_all([@request, nil, Symbol, Symbol, Hash, nil])
+      @ts.read_all([@request, nil, Symbol, Symbol, nil, nil])
     end
 
     def read_executing_all
-      @ts.read_all([@executing, nil, Symbol, Symbol, Hash])
+      @ts.read_all([@executing, nil, Symbol, Symbol, nil])
     end
 
     def read_done_all
-      @ts.read_all([@done, nil, Symbol, Symbol, Hash])
+      @ts.read_all([@done, nil, Symbol, Symbol, nil])
     end
 
     # job executer (worker) methods
     def take_request
-      tuple = @ts.take([@request, nil, Symbol, Symbol, Hash, nil], renewer)
+      tuple = @ts.take([@request, nil, Symbol, Symbol, nil, nil], renewer)
       @ts.write([@executing] + tuple[1..(tuple.size - 1)], renewer)
       tuple
     end
@@ -116,7 +124,7 @@ module Rinda
       end
 
       # read all worker tuples of the specified worker class (class_name)
-      # on the same node (uri: default '[^\s]+' this means any uri)
+      # on the specified node (uri: default '[^\s]+' this means any uri)
       # from specified tuple space (ts)
       # worker type is a subclass of the Rinda::Worker
       # Example:
@@ -126,7 +134,7 @@ module Rinda
       end
 
       # take all worker tuples of the specified worker class (class_name)
-      # on the same node (uri: default '[^\s]+')
+      # on the specified node (uri: default '[^\s]+' this means any uri)
       # from specified tuple space (ts)
       def take_all(ts, class_name, uri = '[^\s]+')
         target = [:name, class_name, nil, Regexp.new(uri + '/\d+')]
@@ -134,7 +142,7 @@ module Rinda
       end
 
       # read a worker tuple of the specified worker class (class_name)
-      # on the same node (uri: default '[^\s]+')
+      # on the specified node (uri: default '[^\s]+' this means any uri)
       # from specified tuple space (ts)
       # this method will wait until ts.read get a response
       def read(ts, class_name, uri = '[^\s]+')
@@ -142,7 +150,7 @@ module Rinda
       end
 
       # take a worker tuple of the specified worker class (class_name)
-      # on the same node (uri: default '[^\s]+')
+      # on the specified node (uri: default '[^\s]+' this means any uri)
       # from specified tuple space (ts)
       # this method will wait until ts.take get a response
       def take(ts, class_name, uri = '[^\s]+')

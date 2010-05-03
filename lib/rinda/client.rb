@@ -1,6 +1,7 @@
 module Rinda
   class Client < DelegateClass(Rinda::Worker)
-    attr_reader :worker
+    attr_reader :worker_client
+    attr_reader :worker_class_name
 
     # ==== Parameters
     # * +worker+ - specify worker class name by under_score form.
@@ -15,10 +16,23 @@ module Rinda
     #   client.write_request(...)
     #   client.take_done(...)
     #
+    #   If you use Rinda::Client from Rails environment, you should use
+    #   @key value with longer lifetime than DRb.uri and object_id, e.g.
+    #   session[:session_id].
+    #
+    #   client = Rinda::Client.new('analyzer', :key => session[:session_id])
+    #
     def initialize(worker, options = {})
       ts = Rinda::WorkerRunner.init_ts(options)
-      @worker = Rinda::Worker.to_class(worker).new(ts, options)
-      super(@worker)
+      @worker_client = Rinda::Worker.to_class(worker).new(ts, options)
+      @worker_class_name = Rinda::Worker.to_class_name(worker)
+      super(@worker_client)
+    end
+
+    def worker(uri = '[^\s]+')
+      uri = URI.parse(DRb.uri)
+      # return the reference to the target Worker
+      Rinda::Worker.read(ts, @worker_class_name.to_sym, uri)
     end
   end
 end
