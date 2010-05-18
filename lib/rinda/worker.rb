@@ -36,12 +36,18 @@ module Rinda
       @key = options[:key] || Rinda::Worker.key(DRb.uri, object_id)
     end
 
+    def allowed_instance_methods
+      %w(echo exit_worker)
+    end
+
     def main_loop
+      logger.info("Start main_loop of #{self.class.to_s}")
       while true
         req_type, req_key, class_name, method_name, options, stream = take_request
         begin
-          target_class = eval class_name.to_s.classify
-          result = target_class.send(method_name.to_s, options)
+          result = nil
+          raise NoMethodError if !allowed_instance_methods.include?(method_name.to_s)
+          result = send(method_name.to_s, options)
           stream.push(result) if !stream.nil?
         rescue => error
           logger.error "Error occurred in #{class_name.to_s}.#{method_name.to_s}"
@@ -60,14 +66,6 @@ module Rinda
     # job requester methods
     def write_request(class_name, method_name, options = {}, stream = nil)
       @ts.write([@request, @key, class_name, method_name, options, stream], renewer)
-    end
-
-    def cancel_request
-      tuple = @ts.take([@request, @key, Symbol, Symbol, nil, nil], renewer)
-    end
-
-    def cancel_request_with_options(options = nil)
-      tuple = @ts.take([@request, @key, Symbol, Symbol, options, nil], renewer)
     end
 
     def exit_request
@@ -104,12 +102,12 @@ module Rinda
       tuple
     end
 
+    def exit_worker(options = {})
+      #FIXME
+      exit
+    end
+
     class << self # Class Methods
-      def exit_worker(options = {})
-        #FIXME
-        exit
-      end
-    
       def key(uri, obj_id)
         "#{uri}/#{obj_id}"
       end

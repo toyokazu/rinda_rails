@@ -30,9 +30,8 @@ module Rinda
     end
 
     def worker(uri = '[^\s]+')
-      uri = URI.parse(DRb.uri)
       # return the reference to the target Worker
-      Rinda::Worker.read(ts, @worker_class_name.to_sym, uri)
+      @worker ||= Rinda::Worker.read(ts, @worker_class_name.to_sym, uri)[2]
     end
   end
 end

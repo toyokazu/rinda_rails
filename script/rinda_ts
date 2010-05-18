@@ -21,11 +21,11 @@ class TSRunner < DRb::Runner
 
   def create_ts
     @ts = Rinda::TupleSpace.new
-    if options[:without_ring_server]
-      DRb.start_service(options[:uri], @ts)
+    if @options[:without_ring_server]
+      DRb.start_service(@options[:uri], @ts)
       logger.info "Starting Rinda::TupleSpace without Rinda::RingServer"
     else
-      DRb.start_service(options[:uri])
+      DRb.start_service(@options[:uri])
       place = Rinda::RingServer.new(@ts)
       logger.info "Starting Rinda::TupleSpace with Rinda::RingServer"
     end
@@ -39,11 +39,11 @@ class TSRunner < DRb::Runner
       opts.separator ""
 
       opts.separator "options:"
-      opts.on("-u", "--uri=uri", String, "Runs Rinda TupleSpace Server or RingServer on the specified url.", "Default: druby://:0") { |v| options[:uri] = v }
-      opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| options[:config] = v }
-      opts.on("-d", "--daemon", "Make server run as a Daemon.") { options[:detach] = true }
-      opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_ts.log") { |v| options[:log_file] = v }
-      opts.on("-r", "--without-ring-server", "Make this server run as a stand alone dRuby server (without RingServer).") { options[:without_ring_server] = true }
+      opts.on("-u", "--uri=uri", String, "Runs Rinda TupleSpace Server or RingServer on the specified url.", "Default: druby://:0") { |v| @options[:uri] = v }
+      opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| @options[:config] = v }
+      opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
+      opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_ts.log") { |v| @options[:log_file] = v }
+      opts.on("-r", "--without-ring-server", "Make this server run as a stand alone dRuby server (without RingServer).") { @options[:without_ring_server] = true }
 
       opts.separator ""
 
@@ -52,7 +52,7 @@ class TSRunner < DRb::Runner
   end
 
   def cmd_start
-    if options[:detach]
+    if @options[:detach]
       raise RuntimeError, "Rinda::TupleSpace Server is already running." if File.exist?(pid_file)
       daemonize(log_file)
       #Process.daemon (supported only by Ruby 1.9)

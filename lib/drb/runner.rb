@@ -17,7 +17,6 @@ module DRb
     OPERATIONS = %w(start stop restart config)
 
     # Parsed options
-    attr_accessor :options
     attr_accessor :log_file
     attr_accessor :pid_file
     attr_accessor :logger
@@ -46,10 +45,10 @@ module DRb
       parse!
 
       @logger = Logger.new(STDOUT)
-      @logger.level = options[:logger_level] || Logger::INFO
+      @logger.level = @options[:logger_level] || Logger::INFO
       
-      @log_file = "#{RAILS_ROOT}/log/#{options[:log_file]}"
-      @pid_file = "#{RAILS_ROOT}/tmp/pids/#{options[:pid_file]}"
+      @log_file = "#{RAILS_ROOT}/log/#{@options[:log_file]}"
+      @pid_file = "#{RAILS_ROOT}/tmp/pids/#{@options[:pid_file]}"
     end
 
     def parser
@@ -57,12 +56,12 @@ module DRb
         opts.banner = "Usage: #{self.class.command} [options] #{self.class.operations.join('|')}"
         opts.separator ""
         opts.separator "options:"
-        opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| options[:config] = v }
-        opts.on("-d", "--daemon", "Make server run as a Daemon.") { options[:detach] = true }
-        opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_worker.log") { |v| options[:log_file] = v }
-        opts.on("-O", "--logger-level=level", {"debug" => Logger::DEBUG, "info" => Logger::INFO, "warn" => Logger::WARN, "error" => Logger::ERROR, "fatal" => Logger::FATAL}, "Specifies Logger level (debug, info, warn, error, fatal)") { |v| options[:logger_level] = v }
-        opts.on("-p", "--pid=file", String, "Specifies pid file name for this server.", "Default: rinda_worker.pid") { |v| options[:pid_file] = v }
-        opts.on("-u", "--uri=uri", String, "Runs Rinda TupleSpace Server or RingServer on the specified url.", "Default: druby://:0") { |v| options[:uri] = v }
+        opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| @options[:config] = v }
+        opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
+        opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_worker.log") { |v| @options[:log_file] = v }
+        opts.on("-O", "--logger-level=level", {"debug" => Logger::DEBUG, "info" => Logger::INFO, "warn" => Logger::WARN, "error" => Logger::ERROR, "fatal" => Logger::FATAL}, "Specifies Logger level (debug, info, warn, error, fatal)") { |v| @options[:logger_level] = v }
+        opts.on("-p", "--pid=file", String, "Specifies pid file name for this server.", "Default: rinda_worker.pid") { |v| @options[:pid_file] = v }
+        opts.on("-u", "--uri=uri", String, "Runs Rinda TupleSpace Server or RingServer on the specified url.", "Default: druby://:0") { |v| @options[:uri] = v }
         
         opts.separator ""
         
