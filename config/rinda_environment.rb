@@ -10,13 +10,3 @@ Rails::Initializer.run do |config|
   config.load_paths += %W( #{RAILS_ROOT}/app/workers )
   config.time_zone = 'UTC'
 end
-
-# ruby standard libraries
-require 'drb/drb'
-require 'rinda/tuplespace'
-require 'rinda/ring'
-
-# plugin libralies
-require 'drb/runner'
-require 'rinda/worker'
-require 'rinda/worker_runner'
