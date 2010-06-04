@@ -29,14 +29,4 @@ Configuration
     ...
     end
 
-    # ruby standard libraries
-    require 'drb/drb'
-    require 'rinda/tuplespace'
-    require 'rinda/ring'
-
-    # plugin libralies
-    require 'drb/runner'
-    require 'rinda/worker'
-    require 'rinda/worker_runner'
-
 Copyright (c) 2010 Toyokazu Akiyama, released under the MIT license
