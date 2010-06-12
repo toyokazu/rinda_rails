@@ -4,10 +4,6 @@
 # ready to load rails libraries
 require File.expand_path('../../config/rinda_min_environment',  __FILE__)
 
-# initialize rubygems libraries
-require 'rubygems'
-require 'daemons'
-
 options = {
   :uri         => 'druby://:0',
   :config      => "#{RAILS_ROOT}/config/rinda_ts.yml",

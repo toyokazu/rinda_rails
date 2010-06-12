@@ -8,6 +8,7 @@ options = {
   :uri          => 'druby://:0',
   :config       => "#{RAILS_ROOT}/config/rinda_worker.yml",
   :detach       => false,
+  :max_instances => '5',
   :num_threads  => '1',
   :worker       => 'analyzer'
 }

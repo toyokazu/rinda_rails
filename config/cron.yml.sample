@@ -1,0 +1,5 @@
+# specify checking cron_jobs.yml interval
+interval: 60
+# if your cron job needs timestamp of the previous execution,
+# set true worker_record flag.
+worker_record: true

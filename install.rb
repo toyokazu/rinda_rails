@@ -6,6 +6,12 @@ FileUtils.cp(File.expand_path('../config/rinda_min_environment.rb', __FILE__),
 FileUtils.cp(File.expand_path('../config/rinda_environment.rb', __FILE__),
              "#{RAILS_ROOT}/config/")
 
+# copy config sample files
+FileUtils.cp(File.expand_path('../config/cron.yml.sample', __FILE__),
+             "#{RAILS_ROOT}/config/")
+FileUtils.cp(File.expand_path('../config/cron_jobs.yml.sample', __FILE__),
+             "#{RAILS_ROOT}/config/")
+
 # copy script files
 FileUtils.cp(File.expand_path('../script/rinda_ts', __FILE__),
              "#{RAILS_ROOT}/script/")

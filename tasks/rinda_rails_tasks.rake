@@ -4,6 +4,12 @@
 # end
 
 namespace :worker_record do
+  def output_error(error, message)
+    puts "Error occurred during #{message}."
+    puts "#{error.class}: #{error.message}"
+    puts error.backtrace
+  end
+
   # FIXME
   # copied from rails_generator/commands.rb
   def gsub_file(relative_destination, regexp, *args, &block)
@@ -44,9 +50,7 @@ namespace :worker_record do
       add_versioned_and_paranoid('worker_record')
       add_version_table_migration('worker_record')
     rescue => error
-      puts "Error occurred in initializing worker_record model."
-      puts "#{error.class}: #{error.message}"
-      puts error.backtrace
+      output_error(error, "Error occurred in initializing worker_record model.")
     end
   end
 
@@ -57,9 +61,7 @@ namespace :worker_record do
       puts cmd
       puts `#{cmd}`
     rescue => error
-      puts "Error occurred in destroying worker_record model."
-      puts "#{error.class}: #{error.message}"
-      puts error.backtrace
+      output_error(error, "Error occurred in destroying worker_record model.")
     end
   end
 end

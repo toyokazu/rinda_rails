@@ -24,7 +24,7 @@ module Rinda
     def initialize(ts, options = {})
       @ts = ts
       @renewer = Rinda::SimpleRenewer.new # use with default setting (180sec)
-      class_name = self.class.to_s.underscore.match(/^([\w_]+)_worker/)[1]
+      class_name = self.class.to_s.underscore.match(/^([\w_\/]+)_worker/)[1]
       @request = :"#{class_name}_request"
       @executing = :"#{class_name}_executing"
       @done = :"#{class_name}_done"
@@ -72,21 +72,21 @@ module Rinda
       @ts.write([@request, @key, self.class.to_s.to_sym, :exit_worker, {}, nil], renewer)
     end
 
-    def take_done
-      @ts.take([@done, @key, Symbol, Symbol, nil], renewer)
+    def take_done(class_name = nil, method_name = nil, options = nil)
+      @ts.take([@done, @key, class_name || Symbol,  method_name || Symbol, options], renewer)
     end
 
     # job monitoring methods
-    def read_request_all
-      @ts.read_all([@request, nil, Symbol, Symbol, nil, nil])
+    def read_request_all(class_name = nil, method_name = nil, options = nil)
+      @ts.read_all([@request, @key, class_name || Symbol, method_name || Symbol, options])
     end
 
-    def read_executing_all
-      @ts.read_all([@executing, nil, Symbol, Symbol, nil])
+    def read_executing_all(class_name = nil, method_name = nil, options = nil)
+      @ts.read_all([@executing, @key, class_name || Symbol, method_name || Symbol, options])
     end
 
-    def read_done_all
-      @ts.read_all([@done, nil, Symbol, Symbol, nil])
+    def read_done_all(class_name = nil, method_name = nil, options = nil)
+      @ts.read_all([@done, @key, class_name || Symbol, method_name || Symbol, options])
     end
 
     # job executer (worker) methods

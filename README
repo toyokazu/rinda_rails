@@ -17,8 +17,9 @@ Example
 Configuration
 =============
 
-    To use worker class at job submitter, app/workers path must be appended
-    to the load_paths of Rails and DRb and Rinda libraries must be loaded.
+    To use worker class defined in app/workers from your Rails default
+    environment, you must append app/workers path to the load_paths of
+    Rails. You should also append "daemons" gem to use Rinda::Client.
 
     edit config/environment.rb
 
@@ -26,6 +27,8 @@ Configuration
     ...
       # add config.load_paths setting
       config.load_paths += %W( #{RAILS_ROOT}/app/workers )
+      # add "daemons" to use Rinda::Client
+      config.gem "daemons"
     ...
     end
 

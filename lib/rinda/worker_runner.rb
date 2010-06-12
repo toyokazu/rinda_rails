@@ -5,12 +5,9 @@ require 'uri'
 # at Rinda::WorkerRunner#initialize and for String#classify
 # at Rinda::WorkerRunner#worker_class, worker_class_name
 
-# initialize rubygems libraries
-# rubygems is already initialized by rails boot.rb in GemBoot case.
-# in VendorBoot case, rubygems is not initialized here.
-# So thus require it here.
-require 'rubygems'
-require 'daemons'
+unless defined?(Daemonize)
+  require 'daemons'
+end
 
 module Rinda
   class WorkerRunner < DRb::Runner
@@ -65,6 +62,11 @@ module Rinda
     def create_worker(ts)
       Thread.current[:worker] = nil
       synchronize do
+        if !@options[:max_instances].nil? &&
+          ts.read_all([:name, worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key]).size > @options[:max_instances]
+          logger.warn("Already specified number of instances/threads (-m or --max-instances option) are found in TupleSpace.")
+          exit 1
+        end
         if @options[:logger_worker]
           uri = URI.parse(DRb.uri)
           # search LoggerWorker running on the same node
@@ -102,6 +104,7 @@ module Rinda
         opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
         opts.on("-e", "--environment=name", String, "Specifies the environment to run this server under (test/development/production).", "Default: development") { |v| @options[:environment] = v }
         opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_worker.log") { |v| @options[:log_file] = v }
+        opts.on("-m", "--max-instances", String, "Specifies max number of instances allowed to register the TupleSpace. Basically used to prevent unnecessary instance start up because of the concurrency issues.", "Default: 5") { |v| @options[:max_instances] = v }
         opts.on("-p", "--pid=file", String, "Specifies pid file name for this server.", "Default: rinda_worker.pid") { |v| @options[:pid_file] = v }
         opts.on("-s", "--ts-uri=uri", String, "Specifies Rinda::TupleSpace Server dRuby URI.") { |v| @options[:ts_uri] = v }
         opts.on("-L", "--logger-worker", "Use LoggerWorker for logging outputs of Workers running on the same node.") do

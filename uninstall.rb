@@ -1,11 +1,15 @@
 # Install hook code here
 require 'fileutils'
-# copy environment files
-FileUtils.rm("#{RAILS_ROOT}/config/rinda_min_environment.rb")
-FileUtils.rm("#{RAILS_ROOT}/config/rinda_environment.rb")
+# remove environment files
+FileUtils.rm "#{RAILS_ROOT}/config/rinda_min_environment.rb", :force => true
+FileUtils.rm "#{RAILS_ROOT}/config/rinda_environment.rb", :force => true
 
-# copy script files
-FileUtils.rm("#{RAILS_ROOT}/script/rinda_ts")
-FileUtils.rm("#{RAILS_ROOT}/script/rinda_logger")
-FileUtils.rm("#{RAILS_ROOT}/script/rinda_worker")
-FileUtils.rm("#{RAILS_ROOT}/script/rinda_worker_cluster")
+# remove config sample files
+FileUtils.rm "#{RAILS_ROOT}/config/cron.yml.sample", :force => true
+FileUtils.rm "#{RAILS_ROOT}/config/cron_jobs.yml.sample", :force => true
+
+# remove script files
+FileUtils.rm "#{RAILS_ROOT}/script/rinda_ts", :force => true
+FileUtils.rm "#{RAILS_ROOT}/script/rinda_logger", :force => true
+FileUtils.rm "#{RAILS_ROOT}/script/rinda_worker", :force => true
+FileUtils.rm "#{RAILS_ROOT}/script/rinda_worker_cluster", :force => true

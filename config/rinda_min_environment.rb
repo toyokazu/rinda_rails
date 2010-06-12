@@ -11,5 +11,6 @@ Rails::Initializer.run do |config|
   config.frameworks = []
   config.plugins = [:rinda_rails]
   config.load_paths += %W( #{RAILS_ROOT}/app/workers )
+  config.gem "daemons"
   config.time_zone = 'UTC'
 end
