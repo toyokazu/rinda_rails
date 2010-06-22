@@ -168,7 +168,12 @@ module Rinda
     class << self # Class Methods
       def init_ts(options = {})
         logger = options[:logger] || Logger.new(STDOUT)
-        DRb.start_service(options[:uri])
+        begin
+          DRb.current_server
+        rescue DRb::DRbServerNotFound => error
+          logger.info "Can not find any current DRb server. Start up new one."
+          DRb.start_service(options[:uri])
+        end
         ts = nil
         if options[:ts_uri].nil?
           ts = Rinda::TupleSpaceProxy.new(Rinda::RingFinger.primary)

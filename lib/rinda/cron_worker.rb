@@ -69,15 +69,16 @@ module Rinda
         end
         @jobs.each do |job|
           worker_type = Rinda::Worker.to_class_name(job[1])
+          client = Rinda::Client.new(job[1])
           if designated_time?(job[0])
-            if read_request_all(worker_type.to_sym, job[2].to_sym, job[3]).size == 0
+            if worker.read_request_all(job[2].to_sym, job[3]).size == 0
               record_start_time(worker_type)
-              write_request(worker_type.to_sym, job[2].to_sym, job[3])
+              worker.write_request(job[2].to_sym, job[3])
             else
               logger.info("Previous job request still remains. Do nothing.")
             end
           end
-          if read_done_all(worker_type.to_sym, job[2].to_sym, job[3]).size > 0
+          if worker.read_done_all(worker_type.to_sym, job[2].to_sym, job[3]).size > 0
             # FIXME
             # recorded end time is not precise end time.
             take_done(worker_type.to_sym, job[2].to_sym, job[3])

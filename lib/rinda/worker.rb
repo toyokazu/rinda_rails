@@ -24,10 +24,10 @@ module Rinda
     def initialize(ts, options = {})
       @ts = ts
       @renewer = Rinda::SimpleRenewer.new # use with default setting (180sec)
-      class_name = self.class.to_s.underscore.match(/^([\w_\/]+)_worker/)[1]
-      @request = :"#{class_name}_request"
-      @executing = :"#{class_name}_executing"
-      @done = :"#{class_name}_done"
+      @underscore_name = Rinda::Worker.to_underscore(self.class.to_s)
+      @request = :"#{@underscore_name}_request"
+      @executing = :"#{@underscore_name}_executing"
+      @done = :"#{@underscore_name}_done"
       @logger = options[:logger]
       if @logger.nil?
         @logger = Logger.new(STDOUT)
@@ -43,18 +43,18 @@ module Rinda
     def main_loop
       logger.info("Start main_loop of #{self.class.to_s}")
       while true
-        req_type, req_key, class_name, method_name, options, stream = take_request
+        req_type, req_key, method_name, options, stream = take_request
         begin
           result = nil
           raise NoMethodError if !allowed_instance_methods.include?(method_name.to_s)
           result = send(method_name.to_s, options)
           stream.push(result) if !stream.nil?
         rescue => error
-          logger.error "Error occurred in #{class_name.to_s}.#{method_name.to_s}"
+          logger.error "Error occurred in main_loop of #{self.class.to_s} for calling method #{method_name.to_s}"
           logger.error "#{error.class}: #{error.message}"
           logger.error error.backtrace
         ensure
-          write_done(req_key, class_name, method_name, options, options[:ts_timeout])
+          write_done(req_key, method_name, options, options[:ts_timeout])
         end
       end
     end
@@ -64,29 +64,29 @@ module Rinda
     end
 
     # job requester methods
-    def write_request(class_name, method_name, options = {}, stream = nil)
-      @ts.write([@request, @key, class_name, method_name, options, stream], renewer)
+    def write_request(method_name, options = {}, stream = nil)
+      @ts.write([@request, @key, method_name, options, stream], renewer)
     end
 
     def exit_request
       @ts.write([@request, @key, self.class.to_s.to_sym, :exit_worker, {}, nil], renewer)
     end
 
-    def take_done(class_name = nil, method_name = nil, options = nil)
-      @ts.take([@done, @key, class_name || Symbol,  method_name || Symbol, options], renewer)
+    def take_done(method_name = nil, options = nil)
+      @ts.take([@done, @key, method_name || Symbol, options], renewer)
     end
 
     # job monitoring methods
-    def read_request_all(class_name = nil, method_name = nil, options = nil)
-      @ts.read_all([@request, @key, class_name || Symbol, method_name || Symbol, options])
+    def read_request_all(method_name = nil, options = nil)
+      @ts.read_all([@request, @key, method_name || Symbol, options])
     end
 
-    def read_executing_all(class_name = nil, method_name = nil, options = nil)
-      @ts.read_all([@executing, @key, class_name || Symbol, method_name || Symbol, options])
+    def read_executing_all(method_name = nil, options = nil)
+      @ts.read_all([@executing, @key, method_name || Symbol, options])
     end
 
-    def read_done_all(class_name = nil, method_name = nil, options = nil)
-      @ts.read_all([@done, @key, class_name || Symbol, method_name || Symbol, options])
+    def read_done_all(method_name = nil, options = nil)
+      @ts.read_all([@done, @key, method_name || Symbol, options])
     end
 
     # job executer (worker) methods
@@ -96,9 +96,9 @@ module Rinda
       tuple
     end
 
-    def write_done(req_key, class_name, method_name, options, timeout = 86400)
-      tuple = @ts.take([@executing, req_key, class_name, method_name, options, nil], renewer)
-      @ts.write([@done, req_key, class_name, method_name, options], timeout)
+    def write_done(req_key, method_name, options, timeout = 86400)
+      tuple = @ts.take([@executing, req_key, method_name, options, nil], renewer)
+      @ts.write([@done, req_key, method_name, options], timeout)
       tuple
     end
 
@@ -110,6 +110,10 @@ module Rinda
     class << self # Class Methods
       def key(uri, obj_id)
         "#{uri}/#{obj_id}"
+      end
+
+      def to_underscore(class_name)
+        class_name.underscore.match(/^([\w_\/]+)_worker/)[1]
       end
 
       def to_class_name(worker)
