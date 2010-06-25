@@ -38,7 +38,7 @@ module Rinda
     end
 
     def record_start_time(worker_type)
-      if @config["record_worker"]
+      if @config["worker_record"]
         wr = worker_record(worker_type)
         wr.start_at = Time.now
         wr.save
@@ -46,7 +46,7 @@ module Rinda
     end
 
     def record_end_time(worker_type)
-      if @config["record_worker"]
+      if @config["worker_record"]
         wr = worker_record(worker_type)
         wr.end_at = Time.now
         wr.save
@@ -69,7 +69,7 @@ module Rinda
         end
         @jobs.each do |job|
           worker_type = Rinda::Worker.to_class_name(job[1])
-          client = Rinda::Client.new(job[1])
+          worker = Rinda::Client.new(job[1], :key => @key)
           if designated_time?(job[0])
             if worker.read_request_all(job[2].to_sym, job[3]).size == 0
               record_start_time(worker_type)
@@ -78,10 +78,10 @@ module Rinda
               logger.info("Previous job request still remains. Do nothing.")
             end
           end
-          if worker.read_done_all(worker_type.to_sym, job[2].to_sym, job[3]).size > 0
+          if worker.read_done_all(job[2].to_sym, job[3]).size > 0
             # FIXME
             # recorded end time is not precise end time.
-            take_done(worker_type.to_sym, job[2].to_sym, job[3])
+            take_done(job[2].to_sym, job[3])
             record_end_time(worker_type)
           end
         end

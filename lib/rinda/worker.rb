@@ -69,29 +69,33 @@ module Rinda
     end
 
     def exit_request
-      @ts.write([@request, @key, self.class.to_s.to_sym, :exit_worker, {}, nil], renewer)
+      @ts.write([@request, @key, :exit_worker, {}, nil], renewer)
     end
 
     def take_done(method_name = nil, options = nil)
-      @ts.take([@done, @key, method_name || Symbol, options], renewer)
+      @ts.take([@done, @req_key, method_name || Symbol, options], renewer)
     end
 
     # job monitoring methods
+    # EXAMPLE
+    #   client = Rinda::Client.new('target_worker')
+    #   # check requests to the target_worker
+    #   client.read_request_all
     def read_request_all(method_name = nil, options = nil)
-      @ts.read_all([@request, @key, method_name || Symbol, options])
+      @ts.read_all([@request, nil, method_name || Symbol, options, nil])
     end
 
     def read_executing_all(method_name = nil, options = nil)
-      @ts.read_all([@executing, @key, method_name || Symbol, options])
+      @ts.read_all([@executing, nil, method_name || Symbol, options, nil])
     end
 
     def read_done_all(method_name = nil, options = nil)
-      @ts.read_all([@done, @key, method_name || Symbol, options])
+      @ts.read_all([@done, nil, method_name || Symbol, options, nil])
     end
 
     # job executer (worker) methods
     def take_request
-      tuple = @ts.take([@request, nil, Symbol, Symbol, nil, nil], renewer)
+      tuple = @ts.take([@request, nil, Symbol, nil, nil], renewer)
       @ts.write([@executing] + tuple[1..(tuple.size - 1)], renewer)
       tuple
     end
