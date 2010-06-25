@@ -69,7 +69,7 @@ module Rinda
         end
         @jobs.each do |job|
           worker_type = Rinda::Worker.to_class_name(job[1])
-          worker = Rinda::Client.new(job[1], :key => @key)
+          worker = Rinda::Client.new(job[1], :ts => @ts, :key => @key, :logger => @logger)
           if designated_time?(job[0])
             if worker.read_request_all(job[2].to_sym, job[3]).size == 0
               record_start_time(worker_type)
@@ -81,7 +81,7 @@ module Rinda
           if worker.read_done_all(job[2].to_sym, job[3]).size > 0
             # FIXME
             # recorded end time is not precise end time.
-            take_done(job[2].to_sym, job[3])
+            worker.take_done(job[2].to_sym, job[3])
             record_end_time(worker_type)
           end
         end

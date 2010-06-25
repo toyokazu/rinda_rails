@@ -10,6 +10,7 @@ module Rinda
     # <tt>:logger</tt>  - Logger instance (default Logger.new(STDOUT))
     # <tt>:uri</tt>     - DRbServer uri of this client
     # <tt>:ts_uri</tt>  - Rinda::TupleSpace server uri (default use RingServer to find Rinda::TupleSpace server)
+    # <tt>:ts</tt>      - Rinda::TupleSpace remote instance already obtained by Rinda::Worker
     #
     # ==== Examples
     #   client = Rinda::Client.new('analyzer', :ts_uri => 'druby://localhost:54321')
@@ -22,8 +23,17 @@ module Rinda
     #
     #   client = Rinda::Client.new('analyzer', :key => session[:session_id])
     #
+    #   If you use Rinda::Client from Rinda::Worker class, you can reuse
+    #   TupleSpace remote instance assigned to Rinda::Worker for Rinda::Client.
+    #   In this case, you can also reuse key attribute of Rinda::Worker for
+    #   Rinda::Client. Furthermore, Logger output should also shared with
+    #   Rinda::Worker.
+    #
+    #   client = Rinda::Client.new('analyzer', :key => @key, :ts => @ts, :logger => @logger)
+    #
     def initialize(worker, options = {})
-      ts = Rinda::WorkerRunner.init_ts(options)
+      ts = options[:ts] || Rinda::WorkerRunner.init_ts(options)
+      options.delete(:ts)
       @worker_client = Rinda::Worker.to_class(worker).new(ts, options)
       @worker_class_name = Rinda::Worker.to_class_name(worker)
       super(@worker_client)
