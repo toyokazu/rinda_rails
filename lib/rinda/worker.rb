@@ -90,7 +90,7 @@ module Rinda
     end
 
     def read_done_all(method_name = nil, options = nil)
-      @ts.read_all([@done, nil, method_name || Symbol, options, nil])
+      @ts.read_all([@done, nil, method_name || Symbol, options])
     end
 
     # job executer (worker) methods
