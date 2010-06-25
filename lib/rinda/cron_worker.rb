@@ -14,7 +14,7 @@ module Rinda
         @config = YAML.load_file("#{RAILS_ROOT}/config/cron.yml")
       rescue => error
         output_error(error, "Can not find cron.yml. Use default configuration.")
-        @config = {"num_of_instances" => 1, "interval" => 60, "record_worker" => true}
+        @config = {"num_of_instances" => 1, "interval" => 60, "worker_record" => true}
       end
     end
 
