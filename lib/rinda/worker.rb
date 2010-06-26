@@ -1,3 +1,6 @@
+require 'monitor'
+require 'logger'
+
 module Rinda
   class Stream
     include MonitorMixin

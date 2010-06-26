@@ -1,18 +1,31 @@
 # initialize ruby standard libraries
 require 'uri'
 
-# active_support is required for String#underscorex
+require File.expand_path('../../drb/runner',  __FILE__)
+require File.expand_path('../../rinda/worker', __FILE__)
+require 'rinda/tuplespace'
+require 'rinda/ring'
+
+# active_support is required for String#underscore
 # at Rinda::WorkerRunner#initialize and for String#classify
 # at Rinda::WorkerRunner#worker_class, worker_class_name
 
-unless defined?(Daemonize)
-  require 'daemons'
-end
+# FIXME
+# this implementation requires that rails must be installed by rubygems
+require 'rubygems'
+require 'active_support'
+require 'daemons'
 
 module Rinda
   class WorkerRunner < DRb::Runner
     include Daemonize
     include MonitorMixin
+
+    def output_error(error, message)
+      logger.error "Error occurred during #{message}."
+      logger.error "#{error.class}: #{error.message}"
+      logger.error error.backtrace
+    end
 
     attr_reader :worker
 
@@ -60,29 +73,34 @@ module Rinda
     end
 
     def create_worker(ts)
-      Thread.current[:worker] = nil
-      synchronize do
-        if !@options[:max_instances].nil? &&
-          ts.read_all([:name, worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key]).size > @options[:max_instances]
-          logger.warn("Already specified number of instances/threads (-m or --max-instances option) are found in TupleSpace.")
-          exit 1
+      begin
+        Thread.current[:worker] = nil
+        synchronize do
+          if !@options[:max_instances].nil? &&
+            ts.read_all([:name, worker_class_name.to_sym, nil, nil]).size > @options[:max_instances].to_i
+            logger.warn("Already specified number of instances/threads (-m or --max-instances option) are found in TupleSpace.")
+            exit 1
+          end
+          if @options[:logger_worker]
+            uri = URI.parse(DRb.uri)
+            # search LoggerWorker running on the same node
+            logger_worker = Rinda::Worker.read(ts, :LoggerWorker, uri.scheme + '://' + uri.host + ':\d+')
+            Thread.current[:worker] = worker_class.new(ts, :logger => logger_worker[2])
+          else
+            Thread.current[:worker] = worker_class.new(ts, :logger => logger)
+          end
+          if @options[:ts_uri].nil?
+            provider = Rinda::RingProvider.new(worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key)
+            provider.provide
+          else
+            ts.write([:name, worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key])
+          end
         end
-        if @options[:logger_worker]
-          uri = URI.parse(DRb.uri)
-          # search LoggerWorker running on the same node
-          logger_worker = Rinda::Worker.read(ts, :LoggerWorker, uri.scheme + '://' + uri.host + ':\d+')
-          Thread.current[:worker] = worker_class.new(ts, :logger => logger_worker[2])
-        else
-          Thread.current[:worker] = worker_class.new(ts, :logger => logger)
-        end
-        if @options[:ts_uri].nil?
-          provider = Rinda::RingProvider.new(worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key)
-          provider.provide
-        else
-          ts.write([:name, worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key])
-        end
+        Thread.current[:worker].main_loop
+      rescue => error
+        output_error(error, "create_workers")
+        exit 1
       end
-      Thread.current[:worker].main_loop
     end
 
     def create_workers(ts)
@@ -92,44 +110,23 @@ module Rinda
       end
     end
 
-    def parser
-      @parser ||= OptionParser.new do |opts|
-        opts.banner = "Usage: #{self.class.command} [options] #{self.class.operations.join('|')}"
-
-        opts.separator ""
-
-        opts.separator "options:"
-        opts.on("-u", "--uri=uri", String, "Runs Rinda Worker on the specified url.", "Default: druby://:0") { |v| @options[:uri] = v }
-        opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| @options[:config] = v }
-        opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
-        opts.on("-e", "--environment=name", String, "Specifies the environment to run this server under (test/development/production).", "Default: development") { |v| @options[:environment] = v }
-        opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_worker.log") { |v| @options[:log_file] = v }
-        opts.on("-m", "--max-instances", String, "Specifies max number of instances allowed to register the TupleSpace. Basically used to prevent unnecessary instance start up because of the concurrency issues.", "Default: 5") { |v| @options[:max_instances] = v }
-        opts.on("-p", "--pid=file", String, "Specifies pid file name for this server.", "Default: rinda_worker.pid") { |v| @options[:pid_file] = v }
-        opts.on("-s", "--ts-uri=uri", String, "Specifies Rinda::TupleSpace Server dRuby URI.") { |v| @options[:ts_uri] = v }
-        opts.on("-L", "--logger-worker", "Use LoggerWorker for logging outputs of Workers running on the same node.") do
-          if @options[:worker] != :logger_worker
-            @options[:logger_worker] = true
-          else
-            puts "--logger-worker (-L) option can not be used for LoggerWorker itself."
-            exit
-          end
+    def add_options(opts)
+      opts.separator "Rinda::WorkerRunner options:"
+      opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
+      opts.on("-e", "--environment=name", String, "Specifies the environment to run this server under (test/development/production).", "Default: development") { |v| @options[:environment] = v }
+      opts.on("-m", "--max-instances", String, "Specifies max number of instances allowed to register the TupleSpace. Basically used to prevent unnecessary instance start up because of the concurrency issues.", "Default: 5") { |v| @options[:max_instances] = v }
+      opts.on("-s", "--ts-uri=uri", String, "Specifies Rinda::TupleSpace Server dRuby URI.") { |v| @options[:ts_uri] = v }
+      opts.on("-L", "--logger-worker", "Use LoggerWorker for logging outputs of Workers running on the same node.") do
+        if @options[:worker] != :logger_worker
+          @options[:logger_worker] = true
+        else
+          puts "--logger-worker (-L) option can not be used for LoggerWorker itself."
+          exit
         end
-        opts.on("-O", "--logger-level=level", {"debug" => Logger::DEBUG, "info" => Logger::INFO, "warn" => Logger::WARN, "error" => Logger::ERROR, "fatal" => Logger::FATAL}, "Specifies Logger level (debug, info, warn, error, fatal)") do |v|
-          if @options[:logger_worker].nil?
-            @options[:logger_level] = v
-          else
-            puts "--logger-level (-O) option can not be used with --logger-worker (-L) option."
-            exit
-          end
-        end
-        opts.on("-t", "--threads=number", String, "Specifies number of worker threads for this server.", "Default: 1") { |v| @options[:num_threads] = v }
-        opts.on("-w", "--worker=worker_class", String, "Specifies worker class name in 'underscore' form as rails.", "No default value (or may be specified in start up script)") { |v| @options[:worker] = v.to_s.underscore.to_sym }
-
-        opts.separator ""
-
-        opts.on("-h", "--help", "Show this help message.") { puts opts; exit }
       end
+      opts.on("-t", "--threads=number", String, "Specifies number of worker threads for this server.", "Default: 1") { |v| @options[:num_threads] = v }
+      opts.on("-w", "--worker=worker_class", String, "Specifies worker class name in 'underscore' form as rails.", "No default value (or may be specified in start up script)") { |v| @options[:worker] = v.to_s.underscore.to_sym }
+      opts.separator ""
     end
 
     def cmd_start

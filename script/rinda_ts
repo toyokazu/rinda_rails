@@ -1,12 +1,16 @@
 #!/usr/bin/env ruby
 
-# initialize minimum rinda_rails
-# ready to load rails libraries
-require File.expand_path('../../config/rinda_min_environment',  __FILE__)
+require File.expand_path('../../lib/drb/runner',  __FILE__)
+require File.expand_path('../../lib/rinda/worker', __FILE__)
+require 'rinda/tuplespace'
+require 'rinda/ring'
+
+# FIXME
+require 'rubygems'
+require 'daemons'
 
 options = {
   :uri         => 'druby://:0',
-  :config      => "#{RAILS_ROOT}/config/rinda_ts.yml",
   :detach      => false,
   :log_file    => 'rinda_ts.log',
   :pid_file    => 'rinda_ts.pid'
@@ -14,6 +18,10 @@ options = {
 
 class TSRunner < DRb::Runner
   include Daemonize
+
+  def self.command
+    File.basename(__FILE__)
+  end
 
   def create_ts
     @ts = Rinda::TupleSpace.new
@@ -28,23 +36,11 @@ class TSRunner < DRb::Runner
     logger.info DRb.uri
   end
 
-  def parser
-    @parser ||= OptionParser.new do |opts|
-      opts.banner = "Usage: #{self.class.command} [options] #{self.class.operations.join('|')}"
+  def add_options(opts)
+    opts.separator "rinta_ts options:"
+    opts.on("-r", "--without-ring-server", "Make this server run as a stand alone dRuby server (without RingServer).") { @options[:without_ring_server] = true }
 
-      opts.separator ""
-
-      opts.separator "options:"
-      opts.on("-u", "--uri=uri", String, "Runs Rinda TupleSpace Server or RingServer on the specified url.", "Default: druby://:0") { |v| @options[:uri] = v }
-      opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| @options[:config] = v }
-      opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
-      opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_ts.log") { |v| @options[:log_file] = v }
-      opts.on("-r", "--without-ring-server", "Make this server run as a stand alone dRuby server (without RingServer).") { @options[:without_ring_server] = true }
-
-      opts.separator ""
-
-      opts.on("-h", "--help", "Show this help message.") { puts opts; exit }
-    end
+    opts.separator ""
   end
 
   def cmd_start

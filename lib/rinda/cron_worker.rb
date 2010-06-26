@@ -16,6 +16,15 @@ module Rinda
         output_error(error, "Can not find cron.yml. Use default configuration.")
         @config = {"num_of_instances" => 1, "interval" => 60, "worker_record" => true}
       end
+      begin
+        @jobs = YAML.load_file("#{RAILS_ROOT}/config/cron_jobs.yml")
+      rescue => error
+        output_error(error, "Can not find cron_jobs.yml. Do notiong.")
+      end
+      @workers = []
+      @jobs.each do |job|
+        @workers << Rinda::Client.new(job[1], :ts => @ts, :key => @key, :logger => @logger)
+      end
     end
 
     def worker_record(worker_type)
@@ -26,7 +35,9 @@ module Rinda
       logger.info("Start main_loop of #{self.class.to_s}")
       while true
         sleep(interval)
+        logger.debug("before exec_cron_jobs")
         exec_cron_jobs
+        logger.debug("after exec_cron_jobs")
       end
     end
 
@@ -39,6 +50,7 @@ module Rinda
 
     def record_start_time(worker_type)
       if @config["worker_record"]
+        logger.debug("write start time to worker_record #{worker_type}")
         wr = worker_record(worker_type)
         wr.start_at = Time.now
         wr.save
@@ -47,6 +59,7 @@ module Rinda
 
     def record_end_time(worker_type)
       if @config["worker_record"]
+        logger.debug("write end time to worker_record #{worker_type}")
         wr = worker_record(worker_type)
         wr.end_at = Time.now
         wr.save
@@ -62,28 +75,30 @@ module Rinda
     def exec_cron_jobs
       synchronize do
         begin
-          @jobs = YAML.load_file("#{RAILS_ROOT}/config/cron_jobs.yml")
-        rescue => error
-          output_error(error, "Can not find cron_jobs.yml. Do notiong.")
-          return
-        end
-        @jobs.each do |job|
-          worker_type = Rinda::Worker.to_class_name(job[1])
-          worker = Rinda::Client.new(job[1], :ts => @ts, :key => @key, :logger => @logger)
-          if designated_time?(job[0])
-            if worker.read_request_all(job[2].to_sym, job[3]).size == 0
-              record_start_time(worker_type)
-              worker.write_request(job[2].to_sym, job[3])
-            else
-              logger.info("Previous job request still remains. Do nothing.")
+          logger.debug("begin synchronization area of exec_cron_jobs")
+          @jobs.each_with_index do |job, i|
+            worker_type = Rinda::Worker.to_class_name(job[1])
+            worker = @workers[i]
+            logger.debug("check job execution time")
+            if designated_time?(job[0])
+              logger.debug("write job request to tuplespace")
+              if worker.read_request_all(job[2].to_sym, job[3]).size == 0
+                record_start_time(worker_type)
+                worker.write_request(job[2].to_sym, job[3])
+              else
+                logger.info("Previous job request still remains. Do nothing.")
+              end
+            end
+            logger.debug("remove finished job tuples")
+            if worker.read_done_all(job[2].to_sym, job[3]).size > 0
+              # FIXME
+              # recorded end time is not precise end time.
+              worker.take_done(job[2].to_sym, job[3])
+              record_end_time(worker_type)
             end
           end
-          if worker.read_done_all(job[2].to_sym, job[3]).size > 0
-            # FIXME
-            # recorded end time is not precise end time.
-            worker.take_done(job[2].to_sym, job[3])
-            record_end_time(worker_type)
-          end
+        rescue => error
+          output_error(error, "An error occured during exec_cron_jobs")
         end
       end
     end

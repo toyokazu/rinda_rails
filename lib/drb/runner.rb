@@ -1,3 +1,5 @@
+require 'drb/drb'
+
 require 'optparse'
 require 'timeout'
 require 'logger'
@@ -47,23 +49,33 @@ module DRb
       @logger = Logger.new(STDOUT)
       @logger.level = @options[:logger_level] || Logger::INFO
       
-      @log_file = "#{RAILS_ROOT}/log/#{@options[:log_file]}"
-      @pid_file = "#{RAILS_ROOT}/tmp/pids/#{@options[:pid_file]}"
+      @log_file = File.expand_path("../../../log/#{@options[:log_file]}",  __FILE__)
+      @pid_file = File.expand_path("../../../tmp/pids/#{@options[:pid_file]}",  __FILE__)
+    end
+
+    def add_options(opts)
     end
 
     def parser
       @parser ||= OptionParser.new do |opts|
         opts.banner = "Usage: #{self.class.command} [options] #{self.class.operations.join('|')}"
         opts.separator ""
-        opts.separator "options:"
+        opts.separator "DRb::Runner options:"
         opts.on("-c", "--config=file", String, "Use custom configuration file") { |v| @options[:config] = v }
         opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
         opts.on("-l", "--log=file", String, "Specifies log file name for this server.", "Default: rinda_worker.log") { |v| @options[:log_file] = v }
-        opts.on("-O", "--logger-level=level", {"debug" => Logger::DEBUG, "info" => Logger::INFO, "warn" => Logger::WARN, "error" => Logger::ERROR, "fatal" => Logger::FATAL}, "Specifies Logger level (debug, info, warn, error, fatal)") { |v| @options[:logger_level] = v }
-        opts.on("-p", "--pid=file", String, "Specifies pid file name for this server.", "Default: rinda_worker.pid") { |v| @options[:pid_file] = v }
+        opts.on("-O", "--logger-level=level", {"debug" => Logger::DEBUG, "info" => Logger::INFO, "warn" => Logger::WARN, "error" => Logger::ERROR, "fatal" => Logger::FATAL}, "Specifies Logger level (debug, info, warn, error, fatal)") do |v|
+          if @options[:logger_worker].nil?
+            @options[:logger_level] = v
+          else
+            puts "--logger-level (-O) option can not be used with --logger-worker (-L) option."
+            exit
+          end
+        end
+        opts.on("-p", "--pid=file", String, "Specifies pid file name for this server.") { |v| @options[:pid_file] = v }
         opts.on("-u", "--uri=uri", String, "Runs Rinda TupleSpace Server or RingServer on the specified url.", "Default: druby://:0") { |v| @options[:uri] = v }
-        
         opts.separator ""
+        add_options(opts)
         
         opts.on("-h", "--help", "Show this help message.") { puts opts; exit }
       end

@@ -1,5 +1,11 @@
 # Install hook code here
 require 'fileutils'
+# copy library files
+FileUtils.cp_r(File.expand_path('../lib/drb', __FILE__),
+             "#{RAILS_ROOT}/lib/")
+FileUtils.cp_r(File.expand_path('../lib/rinda', __FILE__),
+             "#{RAILS_ROOT}/lib/")
+
 # copy environment files
 FileUtils.cp(File.expand_path('../config/rinda_min_environment.rb', __FILE__),
              "#{RAILS_ROOT}/config/")

@@ -1,6 +1,10 @@
 # Install hook code here
 require 'fileutils'
 # remove environment files
+FileUtils.rm_r "#{RAILS_ROOT}/lib/drb", :force => true
+FileUtils.rm_r "#{RAILS_ROOT}/lib/rinda", :force => true
+
+# remove environment files
 FileUtils.rm "#{RAILS_ROOT}/config/rinda_min_environment.rb", :force => true
 FileUtils.rm "#{RAILS_ROOT}/config/rinda_environment.rb", :force => true
 
