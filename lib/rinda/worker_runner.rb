@@ -27,8 +27,6 @@ module Rinda
       logger.error error.backtrace
     end
 
-    attr_reader :worker
-
     # ==== Parameters
     # * +options+ - Options are <tt>:worker</tt>
     #
@@ -46,25 +44,32 @@ module Rinda
     #
     def initialize(argv, options = {})
       super(argv, options.merge(:log_file => 'rinda_worker.log', :pid_file => 'rinda_worker.pid'))
-      logger.formatter = Logger::Formatter.new
-      @worker = @options[:worker].to_s.underscore
+      @worker = @options[:worker]
+      config_file = File.expand_path('../../../config/workers.yml',  __FILE__)
+      @config = File.exists?(config_file) ? YAML.load_file(config_file)[@options[:worker_index] || 0] : nil
+      logger.debug "Startup worker threads #{@config.inspect}"
     end
 
-    def worker_class_name
-      Rinda::Worker.to_class_name(worker)
+    def worker_class_name(worker = nil)
+      Rinda::Worker.to_class_name(worker || @worker)
     end
 
-    def worker_class
-      Rinda::Worker.to_class(worker)
+    def worker_class(worker = nil)
+      Rinda::Worker.to_class(worker || @worker)
     end
 
     def init_env
       # If you need full function of rails, require config/environment here.
       # ==== Example
+      #   options = {
+      #     :env_file  => File.expand_path('../../config/rinda_environment',  __FILE__),
+      #     :environment  => "development"
+      #   }
+      #
       #   class RailsWorkerRunner < Rinda::WorkerRunner
       #     def init_env
       #       ENV["RAILS_ENV"] = options[:environment]
-      #       require "#{RAILS_ROOT}/config/environment"
+      #       require @options[:env_file]
       #     end
       #   end
       #
@@ -72,41 +77,52 @@ module Rinda
       #   runner.run!
     end
 
-    def create_worker(ts)
+    def create_worker(ts, worker = nil, options = {})
       begin
         Thread.current[:worker] = nil
         synchronize do
           if !@options[:max_instances].nil? &&
-            ts.read_all([:name, worker_class_name.to_sym, nil, nil]).size > @options[:max_instances].to_i
+            ts.read_all([:name, worker_class_name(worker), nil, nil]).size > @options[:max_instances]
             logger.warn("Already specified number of instances/threads (-m or --max-instances option) are found in TupleSpace.")
             exit 1
           end
           if @options[:logger_worker]
             uri = URI.parse(DRb.uri)
             # search LoggerWorker running on the same node
-            logger_worker = Rinda::Worker.read(ts, :LoggerWorker, uri.scheme + '://' + uri.host + ':\d+')
-            Thread.current[:worker] = worker_class.new(ts, :logger => logger_worker[2])
+            tuple_type, class_name, instance, drb_uri = Rinda::Worker.read(ts, "LoggerWorker", uri.scheme + '://' + uri.host + ':\d+')
+            Thread.current[:worker] = worker_class(worker).new(ts, {:logger => instance}.merge(options))
           else
-            Thread.current[:worker] = worker_class.new(ts, :logger => logger)
+            Thread.current[:worker] = worker_class(worker).new(ts, {:logger => logger}.merge(options))
           end
           if @options[:ts_uri].nil?
-            provider = Rinda::RingProvider.new(worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key)
+            provider = Rinda::RingProvider.new(worker_class_name(worker), DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key)
             provider.provide
           else
-            ts.write([:name, worker_class_name.to_sym, DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key])
+            ts.write([:name, worker_class_name(worker), DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key])
           end
         end
         Thread.current[:worker].main_loop
       rescue => error
-        output_error(error, "create_workers")
+        output_error(error, "create_worker")
         exit 1
       end
     end
 
     def create_workers(ts)
-      @options[:num_threads].to_i.times do |i|
-        Thread.new(ts) { create_worker(ts) }
-        logger.info "Starting Rinda Worker on URI '#{DRb.uri}' (Thread No.#{sprintf("%02d", i + 1)})"
+      if @config.nil?
+        @options[:num_threads].times do |i|
+          Thread.new(ts) { create_worker(ts) }
+          logger.info "Starting Rinda Worker (#{@worker}) on URI '#{DRb.uri}' (Thread No.#{sprintf("%02d", i + 1)})"
+        end
+      else
+        @config.each do |config|
+          # FIXME (to handle multiple worker threads of the same kind in one process)
+          num_threads, worker, options = config
+          num_threads.times do |i|
+            Thread.new(ts, worker, options) { create_worker(ts, worker, options) }
+            logger.info "Starting Rinda Worker (#{worker}) on URI '#{DRb.uri}' (Thread No.#{sprintf("%02d", i + 1)})"
+          end
+        end
       end
     end
 
@@ -114,18 +130,19 @@ module Rinda
       opts.separator "Rinda::WorkerRunner options:"
       opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
       opts.on("-e", "--environment=name", String, "Specifies the environment to run this server under (test/development/production).", "Default: development") { |v| @options[:environment] = v }
-      opts.on("-m", "--max-instances", String, "Specifies max number of instances allowed to register the TupleSpace. Basically used to prevent unnecessary instance start up because of the concurrency issues.", "Default: 5") { |v| @options[:max_instances] = v }
+      opts.on("-i", "--worker-index=index_number", Integer, "An index in the config/workers.yml file to specify worker config entity.", "Default: 0") { |v| @options[:worker_index] = v }
+      opts.on("-m", "--max-instances", Integer, "Specifies max number of instances allowed to register the TupleSpace. Basically used to prevent unnecessary instance start up because of the concurrency issues.", "Default: 5") { |v| @options[:max_instances] = v }
       opts.on("-s", "--ts-uri=uri", String, "Specifies Rinda::TupleSpace Server dRuby URI.") { |v| @options[:ts_uri] = v }
       opts.on("-L", "--logger-worker", "Use LoggerWorker for logging outputs of Workers running on the same node.") do
-        if @options[:worker] != :logger_worker
+        if @options[:worker] != 'logger_worker'
           @options[:logger_worker] = true
         else
           puts "--logger-worker (-L) option can not be used for LoggerWorker itself."
           exit
         end
       end
-      opts.on("-t", "--threads=number", String, "Specifies number of worker threads for this server.", "Default: 1") { |v| @options[:num_threads] = v }
-      opts.on("-w", "--worker=worker_class", String, "Specifies worker class name in 'underscore' form as rails.", "No default value (or may be specified in start up script)") { |v| @options[:worker] = v.to_s.underscore.to_sym }
+      opts.on("-t", "--threads=number", Integer, "Specifies number of worker threads for this server.", "Default: 1") { |v| @options[:num_threads] = v }
+      opts.on("-w", "--worker=worker_class", String, "Specifies worker class name in 'underscore' form as rails.", "No default value (or may be specified in start up script)") { |v| @options[:worker] = v.to_s.underscore }
       opts.separator ""
     end
 
@@ -144,23 +161,35 @@ module Rinda
           exit(1)
         end
         at_exit do
-          Rinda::Worker.take_all(ts, worker_class_name.to_sym, DRb.uri)
+          if @config.nil?
+            Rinda::Worker.take_all(ts, worker_class_name, DRb.uri)
+          else
+            @config.each do |config|
+              num_threads, worker, options = config
+              Rinda::Worker.take_all(ts, worker_class_name(worker), DRb.uri)
+            end
+          end
           File.delete(pid_file) if File.exist?(pid_file)
         end
         create_workers(ts)
         DRb.thread.join
-
       else
         init_env
         ts = Rinda::WorkerRunner.init_ts(@options.merge(:logger => logger))
         at_exit do
-          Rinda::Worker.take_all(ts, worker_class_name.to_sym, DRb.uri)
+          if @config.nil?
+            Rinda::Worker.take_all(ts, worker_class_name, DRb.uri)
+          else
+            @config.each do |config|
+              num_threads, worker, options = config
+              Rinda::Worker.take_all(ts, worker_class_name(worker), DRb.uri)
+            end
+          end
         end
         create_workers(ts)
         $stdin.gets
       end
     end
-
 
     class << self # Class Methods
       def init_ts(options = {})
@@ -168,8 +197,10 @@ module Rinda
         begin
           DRb.current_server
         rescue DRb::DRbServerNotFound => error
-          logger.info "Can not find any current DRb server. Start up new one."
+          logger.debug "Can not find any current DRb server. Start up new one."
           DRb.start_service(options[:uri])
+          # move to different ThreadGroup to avoid mongrel hang on exit
+          ThreadGroup.new.add DRb.thread
         end
         ts = nil
         if options[:ts_uri].nil?

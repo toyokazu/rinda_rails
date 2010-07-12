@@ -41,7 +41,7 @@ module Rinda
 
     def worker(uri = '[^\s]+')
       # return the reference to the target Worker
-      @worker ||= Rinda::Worker.read(ts, @worker_class_name.to_sym, uri)[2]
+      @worker ||= Rinda::Worker.read(ts, @worker_class_name, uri)[2]
     end
   end
 end

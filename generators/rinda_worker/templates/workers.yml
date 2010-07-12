@@ -1,0 +1,24 @@
+# workers.yml specifies how many processes and threads created
+# by rinda_worker script for each workers. Top level array
+# shows processes, the second level array shows threads in
+# each process.
+# - - - 1 # number of threads for worker01 in process01
+#     - "worker01"
+#     - option01: for worker01 initializer
+#       option02: for worker01 initializer
+#   - - 2 # number of threads for worker02 in process01
+#     - "worker02"
+#     - option01: for worker02 initializer
+#       option02: for worker02 initializer
+# - - - 3 # number of threads for worker03 in process02
+#     - "woker03"
+#     - {}
+#   - - 3 # number of threads for worker04 in process02
+#     - "worker04"
+#     - option01: for worker04 initializer
+#
+# for CronWorker example:
+# - - - 1
+#     - "rinda/cron"
+#     - {}
+<%= yaml_worker_config %>

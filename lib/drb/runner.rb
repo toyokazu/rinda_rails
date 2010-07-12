@@ -48,6 +48,7 @@ module DRb
 
       @logger = Logger.new(STDOUT)
       @logger.level = @options[:logger_level] || Logger::INFO
+      @logger.formatter = Logger::Formatter.new
       
       @log_file = File.expand_path("../../../log/#{@options[:log_file]}",  __FILE__)
       @pid_file = File.expand_path("../../../tmp/pids/#{@options[:pid_file]}",  __FILE__)

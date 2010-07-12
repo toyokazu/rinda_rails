@@ -3,18 +3,20 @@
 require File.expand_path('../../lib/drb/runner',  __FILE__)
 # initialize ruby standard libraries
 require 'digest'
+require 'pathname'
+require 'yaml'
 
 options = {
   :uri            => 'druby://:0',
-  :command        => 'rinda_worker',
   :detach         => true,
-  :environment    => File.expand_path('../../config/rinda_min_environment',  __FILE__),
   :log_file       => 'rinda_worker_cluster.log',
   :pid_file       => 'rinda_worker_cluster.pid',
   :pid_file_prefix  => 'rinda_worker',
-  :num_processes  => '1',
-  :num_threads    => '1',
-  :worker         => :analyzer
+  :command        => 'rinda_worker',
+  :num_processes  => 1,
+  :num_threads    => 1,
+  :worker         => 'rinda/cron',
+  :environment    => 'development'
 }
 
 class WorkerClusterRunner < DRb::Runner
@@ -22,28 +24,45 @@ class WorkerClusterRunner < DRb::Runner
     File.basename(__FILE__)
   end
 
+  def initialize(argv, options = {})
+    super(argv, options)
+    config_file = File.expand_path('../../config/workers.yml',  __FILE__)
+    @config = File.exists?(config_file) ? YAML.load_file(config_file) : nil
+    logger.debug "Startup worker processes #{@config.inspect}"
+  end
 
   def add_options(opts)
     opts.separator "rinda_worker_cluster options:"
     opts.on("-e", "--environment=name", String, "Specifies the environment to run this server under (test/development/production).", "Default: development") { |v| @options[:environment] = v }
-    opts.on("-n", "--processes=number", String, "Specifies number of worker processes for this worker cluster.", "Default: 1") { |v| @options[:num_processes] = v }
+    opts.on("-n", "--processes=number", Integer, "Specifies number of worker processes for this worker cluster.", "Default: 1") { |v| @options[:num_processes] = v }
     opts.on("-p", "--pid=file", String, "Specifies prefix of pid file name [prefix]_[random hash value].pid for this server.", "Default: rinda_worker") { |v| @options[:pid_file_prefix] = v }
     opts.on("-s", "--ts-uri=uri", String, "Specifies Rinda::TupleSpace Server dRuby URI.") { |v| @options[:ts_uri] = v }
     opts.on("-t", "--threads=number", String, "Specifies number of worker threads for each worker process.", "Default: 1") { |v| @options[:num_threads] = v }
-    opts.on("-w", "--worker=worker_class", String, "Specifies worker class name in 'underscore' form as rails.", "No default value (or may be specified in start up script)") { |v| @options[:worker] = v.to_s.underscore.to_sym }
+    opts.on("-w", "--worker=worker_class", String, "Specifies worker class name in 'underscore' form as rails.", "No default value (or may be specified in start up script)") { |v| @options[:worker] = v.to_s.underscore }
 
     opts.separator ""
   end
 
   def cmd_start
-    @options[:num_processes].to_i.times do
-      opts = nil
-      opts = "--ts-uri='#{@options[:ts_uri]}'" if !@options[:ts_uri].nil?
-      hash = Digest::SHA1.hexdigest(Time.now.to_s + rand.to_s)[0..15]
-      cmd = "/usr/bin/env RAILS_ENV=#{@options[:environment]} #{File.expand_path("../../script/#{@options[:command]}", __FILE__)} --daemon --threads=#{@options[:num_threads]} --environment=#{@options[:environment]} --log=#{@options[:log_file]} --pid=#{@options[:pid_file_prefix]}_#{hash}.pid --worker=#{@options[:worker]} #{opts} start"
-      puts cmd
-      puts `#{cmd}`
+    opts = nil
+    opts = "--ts-uri='#{@options[:ts_uri]}'" if !@options[:ts_uri].nil?
+    if @config.nil?
+      opts = "#{opts} --worker=#{@options[:worker]} --threads=#{@options[:num_threads]}"
+      @options[:num_processes].times do
+        hash = Digest::SHA1.hexdigest("#{Time.now}/#{Time.now.usec}")[0..15]
+        rinda_worker_start(opts, hash)
+      end
+    else
+      @config.each_with_index do |config, i|
+        rinda_worker_start("#{opts} --worker-index=#{i}", i)
+      end
     end
+  end
+
+  def rinda_worker_start(opts, suffix) 
+    cmd = "/usr/bin/env RAILS_ENV=#{@options[:environment]} #{File.expand_path("../../script/#{@options[:command]}", __FILE__)} --daemon --environment=#{@options[:environment]} --log=#{@options[:log_file]} --pid=#{@options[:pid_file_prefix]}_#{suffix}.pid #{opts} start"
+    puts cmd
+    puts `#{cmd}`
   end
 
   def cmd_stop

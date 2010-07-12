@@ -50,9 +50,10 @@ class TSRunner < DRb::Runner
       #Process.daemon (supported only by Ruby 1.9)
       File.open(pid_file, 'w'){ |f| f.write(Process.pid) }
       at_exit do
+        renewer = Rinda::SimpleRenewer.new
         while (tuples = Rinda::Worker.read_all(@ts, nil)).size > 0 do
-          # send exit_request to the worker class in the first tuple
-          (eval tuples[0][1].to_s).new(@ts).exit_request
+          # send exit_worker to the worker class in the first tuple
+          Rinda::Worker.exit_request(@ts, tuples[0][1], renewer)
           #FIXME
           sleep 1
         end
@@ -62,9 +63,10 @@ class TSRunner < DRb::Runner
       DRb.thread.join
     else
       at_exit do
+        renewer = Rinda::SimpleRenewer.new
         while (tuples = Rinda::Worker.read_all(@ts, nil)).size > 0 do
           # send exit_request to the worker class in the first tuple
-          (eval tuples[0][1].to_s).new(@ts).exit_request
+          Rinda::Worker.exit_request(@ts, tuples[0][1], renewer)
           #FIXME
           sleep 1
         end

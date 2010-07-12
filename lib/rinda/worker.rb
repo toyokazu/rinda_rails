@@ -1,6 +1,10 @@
 require 'monitor'
 require 'logger'
 
+# for using to_underscore method
+require 'rubygems'
+require 'active_support'
+
 module Rinda
   class Stream
     include MonitorMixin
@@ -22,6 +26,8 @@ module Rinda
 
   class Worker
     attr_reader :ts, :renewer, :key, :logger
+    ACCEPT_METHODS = %w(echo)
+
     # Rinda::Worker instance must be initialized with Rinda::TupleSpace instance.
     # Before getting TupleSpace instance, you need to call DRb.start_service.
     def initialize(ts, options = {})
@@ -37,10 +43,11 @@ module Rinda
         @logger.level = Logger::INFO
       end
       @key = options[:key] || Rinda::Worker.key(DRb.uri, object_id)
-    end
-
-    def allowed_instance_methods
-      %w(echo exit_worker)
+      @accept_methods = options[:accept_methods] || ACCEPT_METHODS
+      # always add exit_worker to handle exit_request
+      @accept_methods << "exit_worker"
+      @accept_methods_regexp = /(#{@accept_methods.join('|')})/
+      @accept_options = options[:accept_options]
     end
 
     def main_loop
@@ -49,7 +56,7 @@ module Rinda
         req_type, req_key, method_name, options, stream = take_request
         begin
           result = nil
-          raise NoMethodError if !allowed_instance_methods.include?(method_name.to_s)
+          raise NoMethodError if !@accept_methods.include?(method_name.to_s)
           result = send(method_name.to_s, options)
           stream.push(result) if !stream.nil?
         rescue => error
@@ -72,11 +79,11 @@ module Rinda
     end
 
     def exit_request
-      @ts.write([@request, @key, :exit_worker, {}, nil], renewer)
+      @ts.write([@request, @key, "exit_worker", {}, nil], renewer)
     end
 
     def take_done(method_name = nil, options = nil)
-      @ts.take([@done, @req_key, method_name || Symbol, options], renewer)
+      @ts.take([@done, @req_key, method_name, options], renewer)
     end
 
     # job monitoring methods
@@ -85,20 +92,20 @@ module Rinda
     #   # check requests to the target_worker
     #   client.read_request_all
     def read_request_all(method_name = nil, options = nil)
-      @ts.read_all([@request, nil, method_name || Symbol, options, nil])
+      @ts.read_all([@request, nil, method_name || @accept_methods_regexp, options || @accept_options, nil])
     end
 
     def read_executing_all(method_name = nil, options = nil)
-      @ts.read_all([@executing, nil, method_name || Symbol, options, nil])
+      @ts.read_all([@executing, nil, method_name || @accept_methods_regexp, options || @accept_options, nil])
     end
 
     def read_done_all(method_name = nil, options = nil)
-      @ts.read_all([@done, nil, method_name || Symbol, options])
+      @ts.read_all([@done, nil, method_name || @accept_methods_regexp, options || @accept_options])
     end
 
     # job executer (worker) methods
     def take_request
-      tuple = @ts.take([@request, nil, Symbol, nil, nil], renewer)
+      tuple = @ts.take([@request, nil, @accept_methods_regexp, @accept_options, nil], renewer)
       @ts.write([@executing] + tuple[1..(tuple.size - 1)], renewer)
       tuple
     end
@@ -132,12 +139,19 @@ module Rinda
         (eval to_class_name(worker))
       end
 
+      # exit_request used at rinda_ts exit phase
+      def exit_request(ts, class_name, renewer = Rinda::SimpleRenewer.new)
+        underscore_name = Rinda::Worker.to_underscore(class_name)
+        request = :"#{underscore_name}_request"
+        ts.write([request, nil, "exit_worker", {}, nil], renewer)
+      end
+
       # read all worker tuples of the specified worker class (class_name)
       # on the specified node (uri: default '[^\s]+' this means any uri)
       # from specified tuple space (ts)
       # worker type is a subclass of the Rinda::Worker
       # Example:
-      #   Rinda::Worker.read_all(ts, :Analyer, 'druby://localhost:54321')
+      #   Rinda::Worker.read_all(ts, "Analyer", 'druby://localhost:54321')
       def read_all(ts, class_name, uri = '[^\s]+')
         ts.read_all([:name, class_name, nil, Regexp.new(uri + '/\d+')])
       end

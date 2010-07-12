@@ -7,9 +7,10 @@ require File.expand_path('../../lib/rinda/worker',  __FILE__)
 options = {
   :uri          => 'druby://:0',
   :detach       => false,
-  :max_instances => '5',
-  :num_threads  => '1',
-  :environment  => File.expand_path('../../config/rinda_environment',  __FILE__),
+  :max_instances => 5,
+  :num_threads  => 1,
+  :env_file  => File.expand_path('../../config/rinda_environment',  __FILE__),
+  :environment  => "development",
   :worker       => 'rinda/cron'
 }
 
@@ -19,7 +20,8 @@ class RailsWorkerRunner < Rinda::WorkerRunner
   end
     
   def init_env
-    require @options[:environment]
+    ENV["RAILS_ENV"] = @options[:environment]
+    require @options[:env_file]
   end
 end
 
