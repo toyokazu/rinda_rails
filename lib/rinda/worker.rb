@@ -58,6 +58,9 @@ module Rinda
 
     def main_loop
       logger.info("Start main_loop of #{self.class.to_s}")
+      logger.info("  key: #{@key.inspect}")
+      logger.info("  accept_methods: #{@accept_methods.inspect}")
+      logger.info("  accept_options: #{@accept_options.inspect}")
       while true
         req_type, req_key, method_name, options, stream = take_request
         begin
@@ -123,6 +126,10 @@ module Rinda
     end
 
     def exit_worker(options = {})
+      logger.info("Exit #{self.class.to_s}")
+      logger.info("  key: #{@key.inspect}")
+      logger.info("  accept_methods: #{@accept_methods.inspect}")
+      logger.info("  accept_options: #{@accept_options.inspect}")
       #FIXME
       exit
     end

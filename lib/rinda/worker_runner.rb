@@ -123,7 +123,7 @@ module Rinda
           num_threads, worker, options = config
           num_threads.times do |i|
             Thread.new(ts, worker, options) { create_worker(ts, worker, options) }
-            logger.info "Starting Rinda Worker (#{worker}) on URI '#{DRb.uri}' (Thread No.#{sprintf("%02d", i + 1)})"
+            logger.info "Starting Rinda Worker (#{worker}) on URI '#{DRb.uri}' with options '#{options.inspect}' (Thread No.#{sprintf("%02d", i + 1)})"
           end
         end
       end

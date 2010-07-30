@@ -51,12 +51,15 @@ class TSRunner < DRb::Runner
       File.open(pid_file, 'w'){ |f| f.write(Process.pid) }
       at_exit do
         renewer = Rinda::SimpleRenewer.new
-        while (tuples = Rinda::Worker.read_all(@ts, nil)).size > 0 do
+        while (tuples = Rinda::Worker.read_all(@ts, /[^(Rinda::LoggerWorker)]/)).size > 0 do
           # send exit_worker to the worker class in the first tuple
           Rinda::Worker.exit_request(@ts, tuples[0][1], renewer)
           #FIXME
           sleep 1
         end
+        Rinda::Worker.exit_request(@ts, "Rinda::LoggerWorker")
+        #FIXME
+        sleep 1
         File.delete(pid_file) if File.exist?(pid_file)
       end
       create_ts
@@ -64,12 +67,15 @@ class TSRunner < DRb::Runner
     else
       at_exit do
         renewer = Rinda::SimpleRenewer.new
-        while (tuples = Rinda::Worker.read_all(@ts, nil)).size > 0 do
+        while (tuples = Rinda::Worker.read_all(@ts, /[^(Rinda::LoggerWorker)]/)).size > 0 do
           # send exit_request to the worker class in the first tuple
           Rinda::Worker.exit_request(@ts, tuples[0][1], renewer)
           #FIXME
           sleep 1
         end
+        Rinda::Worker.exit_request(@ts, "Rinda::LoggerWorker")
+        #FIXME
+        sleep 1
       end
       create_ts
       $stdin.gets
