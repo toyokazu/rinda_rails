@@ -23,6 +23,7 @@
 #     process_option01: process02 rinda_worker command line option
 #
 # for LoggerWorker example:
+# LoggerWorker should be started first.
 # - - - 1
 #     - "rinda/logger"
 #     - {}
@@ -31,5 +32,8 @@
 # for CronWorker example:
 # - - - 1
 #     - "rinda/cron"
-#     - {}
+#     - interval: 60 # specify checking cron_jobs.yml interval
+#       worker_record: true
+#         # if your cron job needs timestamp of the previous execution,
+#         # set worker_record flag true.
 <%= yaml_worker_config %>

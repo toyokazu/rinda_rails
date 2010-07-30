@@ -10,12 +10,7 @@ module Rinda
 
     def initialize(ts, options = {})
       super(ts, options)
-      begin
-        @config = YAML.load_file("#{RAILS_ROOT}/config/cron.yml")
-      rescue => error
-        output_error(error, "initializing CronWorker. Can not find cron.yml. Use default configuration.")
-        @config = {"num_of_instances" => 1, "interval" => 60, "worker_record" => true}
-      end
+      @config = options
       begin
         @jobs = YAML.load_file("#{RAILS_ROOT}/config/cron_jobs.yml")
       rescue => error
@@ -24,7 +19,9 @@ module Rinda
     end
 
     def worker_record(worker_type)
-      WorkerRecord.first(:conditions => {:worker_type => worker_type}) || WorkerRecord.new(:worker_type => worker_type)
+      if defined?(WorkerRecord)
+        WorkerRecord.first(:conditions => {:worker_type => worker_type}) || WorkerRecord.new(:worker_type => worker_type)
+      end
     end
 
     def cron_loop
@@ -111,7 +108,9 @@ module Rinda
 
     class << self # Class Methods
       def worker_record(class_name)
-        WorkerRecord.first(:conditions => {:worker_type => class_name})
+        if defined?(WorkerRecord)
+          WorkerRecord.first(:conditions => {:worker_type => class_name})
+        end
       end
     end
   end
