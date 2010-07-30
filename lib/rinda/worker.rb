@@ -28,6 +28,10 @@ module Rinda
     attr_reader :ts, :renewer, :key, :logger
     ACCEPT_METHODS = %w(echo)
 
+    def accept_options(options = {})
+      options
+    end
+
     # Rinda::Worker instance must be initialized with Rinda::TupleSpace instance.
     # Before getting TupleSpace instance, you need to call DRb.start_service.
     def initialize(ts, options = {})
@@ -43,11 +47,13 @@ module Rinda
         @logger.level = Logger::INFO
       end
       @key = options[:key] || Rinda::Worker.key(DRb.uri, object_id)
-      @accept_methods = options[:accept_methods] || ACCEPT_METHODS
+      @accept_methods = options["accept_methods"] || ACCEPT_METHODS
       # always add exit_worker to handle exit_request
       @accept_methods << "exit_worker"
       @accept_methods_regexp = /(#{@accept_methods.join('|')})/
-      @accept_options = options[:accept_options]
+      @accept_options = accept_options(options["accept_options"])
+      logger.debug(@accept_methods.inspect)
+      logger.debug(@accept_options.inspect)
     end
 
     def main_loop

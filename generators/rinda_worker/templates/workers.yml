@@ -4,18 +4,29 @@
 # each process.
 # - - - 1 # number of threads for worker01 in process01
 #     - "worker01"
-#     - option01: for worker01 initializer
-#       option02: for worker01 initializer
+#     - worker_option01: for worker01 initializer
+#       worker_option02: for worker01 initializer
 #   - - 2 # number of threads for worker02 in process01
 #     - "worker02"
-#     - option01: for worker02 initializer
-#       option02: for worker02 initializer
+#     - worker_option01: for worker02 initializer
+#       worker_option02: for worker02 initializer
+#   - logger_worker: true
+#     max_instances: 20
+#     process_option01: process01 rinda_worker command line option
 # - - - 3 # number of threads for worker03 in process02
 #     - "woker03"
 #     - {}
 #   - - 3 # number of threads for worker04 in process02
 #     - "worker04"
 #     - option01: for worker04 initializer
+#   - max_instances: 20
+#     process_option01: process02 rinda_worker command line option
+#
+# for LoggerWorker example:
+# - - - 1
+#     - "rinda/logger"
+#     - {}
+#   - log_file: rinda_logger.log
 #
 # for CronWorker example:
 # - - - 1

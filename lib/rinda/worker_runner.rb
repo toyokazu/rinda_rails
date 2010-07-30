@@ -43,10 +43,13 @@ module Rinda
     #   In this case, @worker value becomes :analyzer_worker.
     #
     def initialize(argv, options = {})
-      super(argv, options.merge(:log_file => 'rinda_worker.log', :pid_file => 'rinda_worker.pid'))
+      super(argv, {:log_file => 'rinda_worker.log', :pid_file => 'rinda_worker.pid'}.merge(options))
       @worker = @options[:worker]
       config_file = File.expand_path('../../../config/workers.yml',  __FILE__)
       @config = File.exists?(config_file) ? YAML.load_file(config_file)[@options[:worker_index] || 0] : nil
+      if @config.last.is_a?(Hash)
+        @config.pop
+      end
       logger.debug "Startup worker threads #{@config.inspect}"
     end
 
@@ -86,13 +89,13 @@ module Rinda
             logger.warn("Already specified number of instances/threads (-m or --max-instances option) are found in TupleSpace.")
             exit 1
           end
-          if @options[:logger_worker]
-            uri = URI.parse(DRb.uri)
-            # search LoggerWorker running on the same node
-            tuple_type, class_name, instance, drb_uri = Rinda::Worker.read(ts, "LoggerWorker", uri.scheme + '://' + uri.host + ':\d+')
-            Thread.current[:worker] = worker_class(worker).new(ts, {:logger => instance}.merge(options))
-          else
+          if worker_class_name(worker) == "Rinda::LoggerWorker" || @options[:logger_worker].nil?
             Thread.current[:worker] = worker_class(worker).new(ts, {:logger => logger}.merge(options))
+          else
+            uri = URI.parse(DRb.uri)
+            # search Rinda::LoggerWorker running on the same node
+            tuple_type, class_name, instance, drb_uri = Rinda::Worker.read(ts, "Rinda::LoggerWorker", uri.scheme + '://' + uri.host + ':\d+')
+            Thread.current[:worker] = worker_class(worker).new(ts, {:logger => instance.logger}.merge(options))
           end
           if @options[:ts_uri].nil?
             provider = Rinda::RingProvider.new(worker_class_name(worker), DRbObject.new(Thread.current[:worker]), Thread.current[:worker].key)
@@ -131,13 +134,13 @@ module Rinda
       opts.on("-d", "--daemon", "Make server run as a Daemon.") { @options[:detach] = true }
       opts.on("-e", "--environment=name", String, "Specifies the environment to run this server under (test/development/production).", "Default: development") { |v| @options[:environment] = v }
       opts.on("-i", "--worker-index=index_number", Integer, "An index in the config/workers.yml file to specify worker config entity.", "Default: 0") { |v| @options[:worker_index] = v }
-      opts.on("-m", "--max-instances", Integer, "Specifies max number of instances allowed to register the TupleSpace. Basically used to prevent unnecessary instance start up because of the concurrency issues.", "Default: 5") { |v| @options[:max_instances] = v }
+      opts.on("-m", "--max-instances=number_of_instances", Integer, "Specifies max number of worker instances allowed to register the TupleSpace. Basically used to prevent unnecessary instance start up because of the concurrency issues.", "Default: 5") { |v| @options[:max_instances] = v }
       opts.on("-s", "--ts-uri=uri", String, "Specifies Rinda::TupleSpace Server dRuby URI.") { |v| @options[:ts_uri] = v }
-      opts.on("-L", "--logger-worker", "Use LoggerWorker for logging outputs of Workers running on the same node.") do
+      opts.on("-L", "--logger-worker", "Use Rinda::LoggerWorker for logging outputs of Workers running on the same node.") do
         if @options[:worker] != 'logger_worker'
           @options[:logger_worker] = true
         else
-          puts "--logger-worker (-L) option can not be used for LoggerWorker itself."
+          puts "--logger-worker (-L) option can not be used for Rinda::LoggerWorker itself."
           exit
         end
       end
@@ -204,11 +207,11 @@ module Rinda
         end
         ts = nil
         if options[:ts_uri].nil?
-          ts = Rinda::TupleSpaceProxy.new(Rinda::RingFinger.primary)
-          logger.info "Connected to a Rinda::TupleSpace via Rinda::RingServer"
+          ts = Rinda::TupleSpaceProxy.new(Rinda::RingFinger.new.lookup_ring(options[:ring_timeout] || 5))
+          logger.debug "Connected to a Rinda::TupleSpace via Rinda::RingServer"
         else
           ts = Rinda::TupleSpaceProxy.new(DRbObject.new_with_uri(options[:ts_uri]))
-          logger.info "Connected to a Rinda::TupleSpace (#{options[:ts_uri]})"
+          logger.debug "Connected to a Rinda::TupleSpace (#{options[:ts_uri]})"
         end
         ts
       end

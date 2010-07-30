@@ -47,20 +47,36 @@ class WorkerClusterRunner < DRb::Runner
     opts = nil
     opts = "--ts-uri='#{@options[:ts_uri]}'" if !@options[:ts_uri].nil?
     if @config.nil?
-      opts = "#{opts} --worker=#{@options[:worker]} --threads=#{@options[:num_threads]}"
+      opts = "#{opts} --worker=#{@options[:worker]} --threads=#{@options[:num_threads]} --log=#{@options[:log_file]}"
       @options[:num_processes].times do
         hash = Digest::SHA1.hexdigest("#{Time.now}/#{Time.now.usec}")[0..15]
         rinda_worker_start(opts, hash)
       end
     else
       @config.each_with_index do |config, i|
-        rinda_worker_start("#{opts} --worker-index=#{i}", i)
+        curr_opts = opts
+        # extract process startup options from workers.yml configuration
+        if config.last.is_a?(Hash)
+          proc_opts = config.pop
+          if proc_opts["logger_worker"]
+            curr_opts = "#{curr_opts} --logger-worker"
+          end
+          if !proc_opts["log_file"].nil?
+            curr_opts = "#{curr_opts} --log=#{proc_opts["log_file"]}"
+          end
+          if !proc_opts["max_instances"].nil?
+            curr_opts = "#{curr_opts} --max-instances=#{proc_opts["max_instances"]}"
+          end
+        else
+          curr_opts = "#{curr_opts} --log=#{@options[:log_file]}"
+        end
+        rinda_worker_start("#{curr_opts} --worker-index=#{i}", i)
       end
     end
   end
 
   def rinda_worker_start(opts, suffix) 
-    cmd = "/usr/bin/env RAILS_ENV=#{@options[:environment]} #{File.expand_path("../../script/#{@options[:command]}", __FILE__)} --daemon --environment=#{@options[:environment]} --log=#{@options[:log_file]} --pid=#{@options[:pid_file_prefix]}_#{suffix}.pid #{opts} start"
+    cmd = "/usr/bin/env RAILS_ENV=#{@options[:environment]} #{File.expand_path("../../script/#{@options[:command]}", __FILE__)} --daemon --environment=#{@options[:environment]} --pid=#{@options[:pid_file_prefix]}_#{suffix}.pid #{opts} start"
     puts cmd
     puts `#{cmd}`
   end

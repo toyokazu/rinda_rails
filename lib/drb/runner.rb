@@ -1,5 +1,5 @@
 require 'drb/drb'
-
+require 'fileutils'
 require 'optparse'
 require 'timeout'
 require 'logger'
@@ -49,9 +49,12 @@ module DRb
       @logger = Logger.new(STDOUT)
       @logger.level = @options[:logger_level] || Logger::INFO
       @logger.formatter = Logger::Formatter.new
-      
-      @log_file = File.expand_path("../../../log/#{@options[:log_file]}",  __FILE__)
-      @pid_file = File.expand_path("../../../tmp/pids/#{@options[:pid_file]}",  __FILE__)
+      log_dir = File.expand_path("../../../log", __FILE__)
+      FileUtils.mkdir_p(log_dir) if !File.exists?(log_dir)
+      @log_file = "#{log_dir}/#{@options[:log_file]}"
+      pid_dir = File.expand_path("../../../tmp/pids", __FILE__)
+      FileUtils.mkdir_p(pid_dir) if !File.exists?(pid_dir)
+      @pid_file = "#{pid_dir}/#{@options[:pid_file]}"
     end
 
     def add_options(opts)

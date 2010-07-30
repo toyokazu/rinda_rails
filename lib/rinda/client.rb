@@ -1,3 +1,7 @@
+require 'delegate'
+require File.expand_path('../../rinda/worker',  __FILE__)
+require File.expand_path('../../rinda/worker_runner',  __FILE__)
+
 module Rinda
   class Client < DelegateClass(Rinda::Worker)
     attr_reader :worker_client
