@@ -14,6 +14,5 @@ FileUtils.rm "#{RAILS_ROOT}/config/cron_jobs.yml.sample", :force => true
 
 # remove script files
 FileUtils.rm "#{RAILS_ROOT}/script/rinda_ts", :force => true
-FileUtils.rm "#{RAILS_ROOT}/script/rinda_logger", :force => true
 FileUtils.rm "#{RAILS_ROOT}/script/rinda_worker", :force => true
 FileUtils.rm "#{RAILS_ROOT}/script/rinda_worker_cluster", :force => true

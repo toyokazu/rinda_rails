@@ -21,8 +21,6 @@ FileUtils.cp(File.expand_path('../config/cron_jobs.yml.sample', __FILE__),
 # copy script files
 FileUtils.cp(File.expand_path('../script/rinda_ts', __FILE__),
              "#{RAILS_ROOT}/script/")
-FileUtils.cp(File.expand_path('../script/rinda_logger', __FILE__),
-             "#{RAILS_ROOT}/script/")
 FileUtils.cp(File.expand_path('../script/rinda_worker', __FILE__),
              "#{RAILS_ROOT}/script/")
 FileUtils.cp(File.expand_path('../script/rinda_worker_cluster', __FILE__),
