@@ -26,7 +26,6 @@ module Rinda
 
   class Worker
     attr_reader :ts, :renewer, :key, :logger
-    ACCEPT_METHODS = %w(echo)
 
     def accept_options(options = {})
       options
@@ -47,13 +46,11 @@ module Rinda
         @logger.level = Logger::INFO
       end
       @key = options[:key] || Rinda::Worker.key(DRb.uri, object_id)
-      @accept_methods = options["accept_methods"] || ACCEPT_METHODS
+      @accept_methods = options["accept_methods"] || ["echo"]
       # always add exit_worker to handle exit_request
-      @accept_methods << "exit_worker"
+      @accept_methods << "exit_worker" if !@accept_methods.include?("exit_worker")
       @accept_methods_regexp = /(#{@accept_methods.join('|')})/
       @accept_options = accept_options(options["accept_options"])
-      logger.debug(@accept_methods.inspect)
-      logger.debug(@accept_options.inspect)
     end
 
     def main_loop
