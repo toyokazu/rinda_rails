@@ -2,11 +2,11 @@
 # Time.now.strftime("%Y-%m-%d-%H-%M-%w")
 # 
 # Example:
-# - [year-month-day-hour-minute-weekday, class_name, method_name, options]
+# - ['year-month-day-hour-minute-weekday', worker_name, method_name, options]
 # execute SyncWorker#echo method at 2010/01/01 12:00
-# - [2010-01-01-12-00-*, sync, echo, {param1: 1, param2: hoge}]
+# - ['2010-01-01-12-00-*', sync, echo, {param1: 1, param2: hoge}]
 # execute SyncWorker#echo method at every Sunday at 07:00
-# - [*-*-*-07-00-0, sync, echo, {param1: 1, param2: hoge}]
+# - ['*-*-*-07-00-0', sync, echo, {param1: 1, param2: hoge}]
 # execute SyncWorker#echo method at every 2 minutes
 # you can use regular explession
-# - [*-*-*-*-\d[0248]-0, sync, echo, {param1: 1, param2: hoge}]
+# - ['*-*-*-*-\d[02468]-0', sync, echo, {param1: 1, param2: hoge}]

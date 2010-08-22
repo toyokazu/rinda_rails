@@ -18,12 +18,6 @@ module Rinda
       end
     end
 
-    def worker_record(worker_type)
-      if defined?(WorkerRecord)
-        WorkerRecord.first(:conditions => {:worker_type => worker_type}) || WorkerRecord.new(:worker_type => worker_type)
-      end
-    end
-
     def cron_loop
       logger.info("Start cron_loop of #{self.class.to_s}")
       while true
@@ -49,7 +43,7 @@ module Rinda
     def record_start_time(worker_type)
       if @config["worker_record"]
         logger.debug("write start time to worker_record #{worker_type}")
-        wr = worker_record(worker_type)
+        wr = Rinda::CronWorker.worker_record(worker_type)
         wr.start_at = Time.now
         wr.save
       end
@@ -58,7 +52,7 @@ module Rinda
     def record_end_time(worker_type)
       if @config["worker_record"]
         logger.debug("write end time to worker_record #{worker_type}")
-        wr = worker_record(worker_type)
+        wr = Rinda::CronWorker.worker_record(worker_type)
         wr.end_at = Time.now
         wr.save
       end
@@ -107,10 +101,20 @@ module Rinda
     end
 
     class << self # Class Methods
-      def worker_record(class_name)
-        if defined?(WorkerRecord)
-          WorkerRecord.first(:conditions => {:worker_type => class_name})
+      def worker_record(worker_type, force = true)
+        worker_record = nil
+        begin
+          worker_record = WorkerRecord.first(:conditions => {:worker_type => worker_type})
+          if worker_record.nil? && force
+            worker_record = WorkerRecord.new(:worker_type => worker_type)
+          end
+        rescue NameError => e
+          logger.warn "NameError: #{e.message}"
+          logger.warn e.backtrace
+          logger.warn "You need to create WorkerRecord model by rake task (rake worker_record:create) or off the worker_record option in config/workers.yml (worker_record: false)."
+          return nil
         end
+        worker_record
       end
     end
   end
