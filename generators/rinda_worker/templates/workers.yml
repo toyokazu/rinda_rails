@@ -12,6 +12,7 @@
 #       worker_option02: for worker02 initializer
 #   - logger_worker: true
 #     max_instances: 20
+#     ts_uri: druby://localhost:54321
 #     process_option01: process01 rinda_worker command line option
 # - - - 3 # number of threads for worker03 in process02
 #     - "woker03"

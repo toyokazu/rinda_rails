@@ -61,11 +61,17 @@ class WorkerClusterRunner < DRb::Runner
           if proc_opts["logger_worker"]
             curr_opts = "#{curr_opts} --logger-worker"
           end
+          if !proc_opts["logger_level"].nil?
+            curr_opts = "#{curr_opts} --logger-level=#{proc_opts["logger_level"]}"
+          end
           if !proc_opts["log_file"].nil?
             curr_opts = "#{curr_opts} --log=#{proc_opts["log_file"]}"
           end
           if !proc_opts["max_instances"].nil?
             curr_opts = "#{curr_opts} --max-instances=#{proc_opts["max_instances"]}"
+          end
+          if !proc_opts["ts_uri"].nil?
+            curr_opts = "#{curr_opts} --ts-uri=#{proc_opts["ts_uri"]}"
           end
         else
           curr_opts = "#{curr_opts} --log=#{@options[:log_file]}"

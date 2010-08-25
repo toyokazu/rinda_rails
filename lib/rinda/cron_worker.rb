@@ -11,11 +11,6 @@ module Rinda
     def initialize(ts, options = {})
       super(ts, options)
       @config = options
-      begin
-        @jobs = YAML.load_file("#{RAILS_ROOT}/config/cron_jobs.yml")
-      rescue => error
-        output_error(error, "Can not find cron_jobs.yml. Do notiong.")
-      end
     end
 
     def cron_loop
@@ -67,6 +62,7 @@ module Rinda
     def exec_cron_jobs
       synchronize do
         begin
+          @jobs = YAML.load_file("#{RAILS_ROOT}/config/cron_jobs.yml")
           logger.debug("begin synchronization area of exec_cron_jobs")
           @jobs.each_with_index do |job, i|
             schedule, worker_name, method, options = job

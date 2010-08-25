@@ -25,7 +25,7 @@ namespace :worker_record do
   def add_versioned_and_paranoid(model)
     sentinel = "class #{model.classify} < ActiveRecord::Base"
     gsub_file "app/models/#{model}.rb", /(#{Regexp.escape(sentinel)})/mi do |match|
-      "#{match}\n  acts_as_versioned\n  acts_as_paranoid"
+      "#{match}\n  acts_as_versioned :max_version_limit => 30\n  acts_as_paranoid"
     end
   end
 
