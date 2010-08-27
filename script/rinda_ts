@@ -45,7 +45,7 @@ class TSRunner < DRb::Runner
 
   def cmd_start
     if @options[:detach]
-      raise RuntimeError, "Rinda::TupleSpace Server is already running." if File.exist?(pid_file)
+      raise RuntimeError, "Rinda::TupleSpace Server is already running (pid file #{pid_file} exists)." if File.exist?(pid_file)
       daemonize(log_file)
       #Process.daemon (supported only by Ruby 1.9)
       File.open(pid_file, 'w'){ |f| f.write(Process.pid) }
